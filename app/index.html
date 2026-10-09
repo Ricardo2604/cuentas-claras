@@ -1417,6 +1417,27 @@ function viewTasas() {
 }
 
 // ---------- Ajustes ----------
+
+// ---------- Sugerencias (solo versión de prueba) ----------
+// Se envían a un Google Form de Ricardo; él las ve en la hoja de respuestas.
+// Para conectarlo: pega aquí el id del formulario y los entry.N de cada pregunta (salen del enlace prellenado).
+const APP_VER = 'v30';
+const SUGG = { form: '', name: '', email: '', text: '', meta: '' };
+const TEST_BUILD = /github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
+const suggReady = () => !!(SUGG.form && SUGG.name && SUGG.email && SUGG.text);
+async function suggPost(x) {
+  const f = new URLSearchParams(); f.set(SUGG.name, x.name); f.set(SUGG.email, x.email); f.set(SUGG.text, x.text); if (SUGG.meta) f.set(SUGG.meta, x.meta);
+  // Google Forms no responde a otras páginas: con no-cors se envía igual, aunque no podamos leer la respuesta.
+  await fetch(`https://docs.google.com/forms/d/e/${SUGG.form}/formResponse`, { method: 'POST', mode: 'no-cors', body: f });
+}
+async function suggFlush() {
+  if (!suggReady() || !navigator.onLine) return 0;
+  const q = lsGet('cc.suggQ', []) || []; let sent = 0;
+  while (q.length) { try { await suggPost(q[0]); q.shift(); sent++; lsSet('cc.suggQ', q); } catch (e) { break; } }
+  return sent;
+}
+window.addEventListener('online', () => { suggFlush(); });
+setTimeout(() => { suggFlush(); }, 5000);
 function viewAjustes() {
   const c = S.cfg; const op = c.opening || { amount: '', cur: c.mainCur };
   const seg = (key, opts) => `<span class="seg">${opts.map(([v, l]) => `<button data-cfg="${key}:${v}" aria-pressed="${c[key] === v}">${l}</button>`).join('')}</span>`;
@@ -1428,6 +1449,15 @@ function viewAjustes() {
     <div class="cls"><span>${T('Mis ingresos llegan en', 'My income comes in')}</span>${seg('incomeCur', [['USD', 'US$'], ['VES', 'Bs']])}</div>
     <div class="cls"><span>${T('Convertir con tasa', 'Convert with rate')}</span>${seg('convRate', [['bcv', 'BCV'], ['usdt', 'USDT']])}</div>
   </section>
+  ${TEST_BUILD ? `<section class="card sugg"><div class="label">💡 ${T('Sugerencias · versión de prueba', 'Suggestions · test version')}</div>
+    <p class="note">${T('¿Algo no funciona, falta algo o se te ocurre una idea? Escríbelo aquí y le llega a Ricardo. Tu Gmail también sirve para darte acceso a la app en Play Store.', 'Something broken or an idea? Write it here.')}</p>
+    <div class="field"><label for="sgName">${T('Tu nombre', 'Your name')}</label><input id="sgName" maxlength="40" value="${esc((lsGet('cc.suggMe', {}) || {}).name || uname())}"></div>
+    <div class="field"><label for="sgMail">${T('Tu Gmail', 'Your Gmail')}</label><input id="sgMail" type="email" inputmode="email" autocomplete="email" maxlength="80" placeholder="nombre@gmail.com" value="${esc((lsGet('cc.suggMe', {}) || {}).email || '')}"></div>
+    <div class="field"><label for="sgWhere">${T('¿Sobre qué parte?', 'Which part?')}</label><select id="sgWhere">${[T('General', 'General'), T('Inicio', 'Home'), T('Movimientos', 'Entries'), T('Análisis', 'Insights'), T('Me debes / Te debo', 'Loans'), T('Plan', 'Plan'), T('Tasas', 'Rates'), T('Mascota', 'Pet'), T('Bloqueo con huella', 'Lock'), T('Avisos del banco', 'Bank alerts')].map(x => `<option>${esc(x)}</option>`).join('')}</select></div>
+    <div class="field"><label for="sgText">${T('Tu sugerencia', 'Your suggestion')}</label><textarea id="sgText" maxlength="1500" placeholder="${T('Ej. Me gustaría poder…', 'e.g. I would like to…')}"></textarea></div>
+    <button class="primary sm" id="sgSend" style="justify-self:start">${T('Enviar sugerencia', 'Send suggestion')}</button>
+    ${(lsGet('cc.suggQ', []) || []).length ? `<p class="note">${T(`Tienes ${(lsGet('cc.suggQ', []) || []).length} por enviar; salen solas cuando haya conexión.`, 'Some are pending and will send automatically.')}</p>` : ''}
+  </section>` : ''}
   <section class="card"><div class="label">${T('Bloqueo con huella', 'Fingerprint lock')}</div>
     <p class="note">${T('Al abrir la app te pido la huella. El PIN es el respaldo si la huella falla. Se guarda solo en este teléfono.', 'Asks for your fingerprint when the app opens. The PIN is the backup.')}</p>
     ${LOCK.on ? `<p><b>${LOCK.cred ? T('Activado con huella y PIN.', 'On with fingerprint and PIN.') : T('Activado con PIN.', 'On with PIN.')}</b></p>
@@ -2365,6 +2395,20 @@ document.addEventListener('click', async e => {
   if (pt) { const k = pt.dataset.pet; if (LOCK.on) { LOCK.pet = k; lockSave(); } const was = S.cfg.mascot.kind; S.cfg.mascot = { kind: k, name: (was !== k && PETS[k]) ? PETS[k].name : S.cfg.mascot.name }; render(); store.saveCfg(); return; }
   if (e.target.closest('#userSave')) { const n = $('#userName').value.trim(); if (n) { S.cfg.user = { ...(S.cfg.user || {}), name: n }; render(); store.saveCfg(); toast(T(`Listo, ${n}`, `Done, ${n}`)); } return; }
   if (e.target.closest('#gearBtn')) { S.tab = 'ajustes'; render(); window.scrollTo(0, 0); petEvent('tab'); return; }
+  if (e.target.closest('#sgSend')) {
+    const name = $('#sgName').value.trim(), email = $('#sgMail').value.trim().toLowerCase(), text = $('#sgText').value.trim();
+    if (!name) return toast(T('Escribe tu nombre.', 'Add your name.'));
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return toast(T('Revisa tu Gmail.', 'Check your email.'));
+    if (text.length < 3) return toast(T('Escribe tu sugerencia.', 'Write your suggestion.'));
+    lsSet('cc.suggMe', { name, email });
+    const meta = `${APP_VER} · ${$('#sgWhere').value} · ${navigator.userAgent.match(/Android [\d.]+|iPhone OS [\d_]+/)?.[0] || 'otro'} · ${new Date().toISOString().slice(0, 16)}`;
+    const q = lsGet('cc.suggQ', []) || []; q.push({ name, email, text, meta }); lsSet('cc.suggQ', q);
+    const btn = e.target.closest('#sgSend'); btn.disabled = true;
+    const sent = await suggFlush(); $('#sgText').value = ''; btn.disabled = false; render();
+    toast(sent ? T('¡Gracias! Tu sugerencia le llegó a Ricardo.', 'Thanks! Sent.') : T('¡Gracias! La guardé y se envía sola en cuanto se pueda.', 'Thanks! Saved; it will send automatically.'));
+    if (petOn()) petNote(T(`¡Gracias, ${name.split(' ')[0]}! Con ideas así esta app se pone cada vez mejor.`, 'Thanks for the idea!'), 'laugh');
+    return;
+  }
   if (e.target.closest('#lkOn')) { const a = $('#lkNew').value.trim(), b = $('#lkNew2').value.trim();
     if (!/^\d{4,8}$/.test(a)) return toast(T('El PIN debe tener de 4 a 8 números.', 'PIN must be 4–8 digits.'));
     if (a !== b) return toast(T('Los dos PIN no coinciden.', 'PINs do not match.'));
