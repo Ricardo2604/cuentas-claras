@@ -321,6 +321,15 @@ details.how summary { font-weight: 700; cursor: pointer; }
 .pets button svg { width: 52px; height: 52px; }
 .pets button[aria-pressed="true"] { border-color: var(--accent); background: var(--surface-2); }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(96px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 14px; font-weight: 600; z-index: 30; box-shadow: var(--shadow); max-width: calc(100% - 32px); }
+body.locked .app, body.locked nav.tabs, body.locked #sheetRoot, body.locked #onbRoot, body.locked #popRoot { visibility: hidden; }
+#lockRoot { position: fixed; inset: 0; z-index: 100; background: var(--bg); display: grid; place-items: center; padding: 24px 16px; }
+.lock { display: grid; gap: 12px; justify-items: center; text-align: center; width: min(340px, 100%); }
+.lock .lk-ico { font-size: 48px; }
+.lock h2 { margin: 0; }
+.lock input { font: inherit; font-size: 22px; text-align: center; letter-spacing: .3em; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); width: 100%; }
+.lock .primary { width: 100%; }
+.lock .linkbtn { justify-self: center; }
+.lock .lk-forgot { margin-top: 16px; font-size: 13px; }
 </style>
 
 <div class="app">
@@ -354,6 +363,67 @@ const RATES_SEED = { bcv: { rate: 874.7321, date: '2026-10-08', at: '2026-10-09T
 // ---------- Estado ----------
 const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+
+// ---------- Bloqueo con huella ----------
+// La huella la verifica el propio teléfono (WebAuthn con el lector del equipo, sin servidor).
+// Protege contra quien agarre el teléfono; el PIN es el respaldo si la huella no está disponible.
+const LOCK = Object.assign({ on: false, cred: null, pin: null, salt: null }, lsGet('cc.lock', {}) || {});
+const LK = { mode: 'bio', err: '', busy: false, fails: 0, until: 0 };
+const LKS = { bio: null };
+const b64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const ub64u = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - s.length % 4) % 4)), c => c.charCodeAt(0));
+const rnd32 = () => crypto.getRandomValues(new Uint8Array(32));
+async function pinHash(pin, salt) { return b64u(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(salt + ':' + pin))); }
+async function bioAvailable() { try { return !!(window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()); } catch (e) { return false; } }
+bioAvailable().then(v => { LKS.bio = v; });
+async function bioCreate(name) {
+  const c = await navigator.credentials.create({ publicKey: { rp: { name: 'Cuentas Claras' }, user: { id: rnd32().slice(0, 16), name: 'cuentas-claras', displayName: name || 'Cuentas Claras' }, challenge: rnd32(), pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }], authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required', residentKey: 'discouraged' }, timeout: 60000, attestation: 'none' } });
+  if (!c) throw new Error('cancel'); return b64u(c.rawId);
+}
+async function bioCheck() {
+  const a = await navigator.credentials.get({ publicKey: { challenge: rnd32(), allowCredentials: [{ type: 'public-key', id: ub64u(LOCK.cred), transports: ['internal'] }], userVerification: 'required', timeout: 60000 } });
+  if (!a) throw new Error('cancel');
+  if (!(new Uint8Array(a.response.authenticatorData)[32] & 4)) throw new Error('uv'); // el teléfono confirmó que eras tú
+}
+const lockSave = () => lsSet('cc.lock', LOCK);
+function lockDraw() {
+  let r = document.getElementById('lockRoot'); if (!r) { r = document.createElement('div'); r.id = 'lockRoot'; document.body.appendChild(r); }
+  const mode = LOCK.cred ? LK.mode : 'pin';
+  r.innerHTML = `<div class="lock" role="dialog" aria-modal="true" aria-labelledby="lkTitle"><div class="lk-ico" aria-hidden="true">🔒</div><h2 id="lkTitle">Cuentas Claras</h2><p class="note">Tus cuentas están protegidas.</p>
+    ${mode === 'bio' ? `<button class="primary" id="lkBio" ${LK.busy ? 'disabled' : ''}>☝️ Desbloquear con huella</button><button class="linkbtn" id="lkUsePin">Usar mi PIN</button>`
+      : `<input id="lkPin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="PIN" aria-label="PIN"><button class="primary" id="lkPinGo">Entrar</button>${LOCK.cred ? '<button class="linkbtn" id="lkUseBio">Usar huella</button>' : ''}`}
+    ${LK.err ? `<p class="err" role="alert">${LK.err}</p>` : ''}
+    <button class="linkbtn lk-forgot" id="lkForgot">Olvidé mi PIN</button></div>`;
+  const i = r.querySelector('#lkPin'); if (i) i.focus();
+}
+function unlock() { document.body.classList.remove('locked'); const r = document.getElementById('lockRoot'); if (r) r.remove(); LK.err = ''; LK.fails = 0; }
+async function tryBio(silent) {
+  if (LK.busy) return; LK.busy = true; LK.err = ''; lockDraw();
+  try { await bioCheck(); LK.busy = false; unlock(); }
+  catch (e) { LK.busy = false; LK.err = silent ? '' : 'No se pudo leer la huella. Intenta de nuevo o usa tu PIN.'; lockDraw(); }
+}
+async function tryPin(v) {
+  if (Date.now() < LK.until) { LK.err = 'Muchos intentos. Espera 30 segundos.'; return lockDraw(); }
+  if (LOCK.pin && v && await pinHash(v, LOCK.salt) === LOCK.pin) return unlock();
+  LK.fails++; if (LK.fails >= 5) { LK.until = Date.now() + 30000; LK.fails = 0; }
+  LK.err = 'PIN incorrecto.'; lockDraw();
+}
+document.addEventListener('click', async e => {
+  const t = e.target.closest && e.target.closest('button'); if (!t) return;
+  if (t.id === 'lkBio') return tryBio(false);
+  if (t.id === 'lkUsePin') { LK.mode = 'pin'; LK.err = ''; return lockDraw(); }
+  if (t.id === 'lkUseBio') { LK.mode = 'bio'; LK.err = ''; return lockDraw(); }
+  if (t.id === 'lkPinGo') return tryPin(document.getElementById('lkPin').value.trim());
+  if (t.id === 'lkForgot') {
+    if (confirm('Sin el PIN solo puedo quitar el bloqueo borrando los datos guardados en este teléfono. Esto no se puede deshacer. ¿Borrar y quitar el bloqueo?')) {
+      try { Object.keys(localStorage).filter(k => k.startsWith('cc.')).forEach(k => localStorage.removeItem(k)); } catch (err) {}
+      location.reload();
+    }
+    return;
+  }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target && e.target.id === 'lkPin') tryPin(e.target.value.trim()); });
+if (LOCK.on && LOCK.pin) { document.body.classList.add('locked'); lockDraw(); if (LOCK.cred) setTimeout(() => tryBio(true), 250); }
 const S = {
   tx: [],
   cfg: {
@@ -1327,6 +1397,15 @@ function viewAjustes() {
     <div class="cls"><span>${T('Mis ingresos llegan en', 'My income comes in')}</span>${seg('incomeCur', [['USD', 'US$'], ['VES', 'Bs']])}</div>
     <div class="cls"><span>${T('Convertir con tasa', 'Convert with rate')}</span>${seg('convRate', [['bcv', 'BCV'], ['usdt', 'USDT']])}</div>
   </section>
+  <section class="card"><div class="label">${T('Bloqueo con huella', 'Fingerprint lock')}</div>
+    <p class="note">${T('Al abrir la app te pido la huella. El PIN es el respaldo si la huella falla. Se guarda solo en este teléfono.', 'Asks for your fingerprint when the app opens. The PIN is the backup.')}</p>
+    ${LOCK.on ? `<p><b>${LOCK.cred ? T('Activado con huella y PIN.', 'On with fingerprint and PIN.') : T('Activado con PIN.', 'On with PIN.')}</b></p>
+      ${!LOCK.cred ? `<p class="note">${LKS.bio === false ? T('Aquí el teléfono no deja usar la huella. Ábrela desde el enlace de la app en Chrome para usarla.', 'Fingerprint is not available here.') : ''}</p><button class="chip-btn" id="lkBioAdd" style="justify-self:start">☝️ ${T('Agregar huella', 'Add fingerprint')}</button>` : ''}
+      <button class="linkbtn" id="lkOff" style="justify-self:start">${T('Quitar bloqueo', 'Turn off lock')}</button>`
+    : `<div class="field"><label for="lkNew">${T('Crea un PIN de respaldo (4 a 8 números)', 'Create a backup PIN (4–8 digits)')}</label><input id="lkNew" type="password" inputmode="numeric" autocomplete="new-password" maxlength="8"></div>
+      <div class="field"><label for="lkNew2">${T('Repite el PIN', 'Repeat the PIN')}</label><input id="lkNew2" type="password" inputmode="numeric" autocomplete="new-password" maxlength="8"></div>
+      <button class="primary sm" id="lkOn" style="justify-self:start">🔒 ${T('Activar bloqueo con huella', 'Turn on fingerprint lock')}</button>`}
+  </section>
   <section class="card"><div class="label">${T('Tu perfil', 'Your profile')}</div>
     <div class="field"><label for="userName">${T('Tu nombre', 'Your name')}</label><div class="inline"><input id="userName" maxlength="24" value="${esc(uname())}"><button class="primary sm" id="userSave">${T('Guardar', 'Save')}</button></div></div>
     <div class="cls"><span>${T('Cómo te hablo', 'How I address you')}</span><span class="seg">${[['m', T('Hombre', 'Man')], ['f', T('Mujer', 'Woman')], ['x', T('Neutro', 'Neutral')]].map(([v, l]) => `<button data-gender="${v}" aria-pressed="${(S.cfg.user && S.cfg.user.gender) === v}">${l}</button>`).join('')}</span></div>
@@ -2255,6 +2334,15 @@ document.addEventListener('click', async e => {
   if (pt) { const k = pt.dataset.pet; const was = S.cfg.mascot.kind; S.cfg.mascot = { kind: k, name: (was !== k && PETS[k]) ? PETS[k].name : S.cfg.mascot.name }; render(); store.saveCfg(); return; }
   if (e.target.closest('#userSave')) { const n = $('#userName').value.trim(); if (n) { S.cfg.user = { ...(S.cfg.user || {}), name: n }; render(); store.saveCfg(); toast(T(`Listo, ${n}`, `Done, ${n}`)); } return; }
   if (e.target.closest('#gearBtn')) { S.tab = 'ajustes'; render(); window.scrollTo(0, 0); petEvent('tab'); return; }
+  if (e.target.closest('#lkOn')) { const a = $('#lkNew').value.trim(), b = $('#lkNew2').value.trim();
+    if (!/^\d{4,8}$/.test(a)) return toast(T('El PIN debe tener de 4 a 8 números.', 'PIN must be 4–8 digits.'));
+    if (a !== b) return toast(T('Los dos PIN no coinciden.', 'PINs do not match.'));
+    LOCK.salt = b64u(rnd32()); LOCK.pin = await pinHash(a, LOCK.salt); LOCK.cred = null;
+    try { if (await bioAvailable()) LOCK.cred = await bioCreate(uname()); } catch (err) { LOCK.cred = null; }
+    LOCK.on = true; lockSave(); render();
+    toast(LOCK.cred ? T('Listo: la próxima vez que abras la app te pido la huella.', 'Done: fingerprint on next open.') : T('Bloqueo activado con PIN. La huella no se pudo activar aquí.', 'Lock on with PIN; fingerprint unavailable here.')); return; }
+  if (e.target.closest('#lkBioAdd')) { try { LOCK.cred = await bioCreate(uname()); lockSave(); render(); toast(T('Huella agregada.', 'Fingerprint added.')); } catch (err) { toast(T('El teléfono no dejó usar la huella aquí.', 'Fingerprint not available here.')); } return; }
+  if (e.target.closest('#lkOff')) { if (confirm(T('¿Quitar el bloqueo? Cualquiera que abra la app verá tus cuentas.', 'Turn off the lock?'))) { LOCK.on = false; LOCK.cred = null; LOCK.pin = null; LOCK.salt = null; lockSave(); render(); toast(T('Bloqueo quitado.', 'Lock off.')); } return; }
   const pty = e.target.closest('[data-pm-type]'); if (pty) { const x = PM.items[+pty.dataset.pmType]; x.type = x.type === 'ingreso' ? 'gasto' : 'ingreso'; x.cat = x.type === 'ingreso' ? 'otro_ing' : guessCat([x.who, x.concept].filter(Boolean).join(' '), 'gasto'); render(); return; }
   const smb = e.target.closest('[data-sms]'); if (smb) { S.cfg.smsBridge = smb.dataset.sms === '1'; store.saveCfg(); render(); return; }
   if (e.target.closest('#smsGo')) { smsCheck(); return; }
