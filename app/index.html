@@ -598,7 +598,7 @@ const store = {
       this.cfgDoc.onSnapshot(snap => {
         const v = snap.exists ? snap.data() : null;
         if (v && !snap.metadata.hasPendingWrites) { mergeCfg(v); applyTheme(); lsSet('cc.lang', S.cfg.lang); lsSet('cc.theme', S.cfg.theme); }
-        S.cfgLoaded = true;
+        S.cfgLoaded = true; appIcon(S.cfg.mascot && S.cfg.mascot.kind);
         render();
       }, () => {});
     } else {
@@ -608,7 +608,7 @@ const store = {
       // v1 guardaba la clasificación aparte
       const e = lsGet('cc.ess', null); if (e && !c) S.cfg.ess = e;
       applyTheme();
-      S.cfgLoaded = true; S.loaded = true; render(); setTimeout(smsFromUrl, 300);
+      S.cfgLoaded = true; appIcon(S.cfg.mascot && S.cfg.mascot.kind); S.loaded = true; render(); setTimeout(smsFromUrl, 300);
     }
   },
   saveLocal() { lsSet('cc.tx', S.tx); lsSet('cc.cfg', S.cfg); },
@@ -1197,7 +1197,7 @@ function onbRead() {
 }
 function onbFinish() {
   S.cfg.user = { name: ONB.name, gender: ONB.gender };
-  S.cfg.mascot = { kind: ONB.pet, name: ONB.petName || PETS[ONB.pet].name };
+  S.cfg.mascot = { kind: ONB.pet, name: ONB.petName || PETS[ONB.pet].name }; appIcon(ONB.pet);
   const a = parseAmount(ONB.amt); const sv = parseAmount(ONB.save || '');
   if (a !== null) S.cfg.opening = { amount: Math.max(a - (sv || 0), 0), cur: ONB.cur };
   if (sv !== null) S.cfg.openingSave = { amount: sv, cur: ONB.cur };
@@ -1426,7 +1426,7 @@ function viewTasas() {
 // ---------- Sugerencias (solo versión de prueba) ----------
 // Se envían a un Google Form de Ricardo; él las ve en la hoja de respuestas.
 // Para conectarlo: pega aquí el id del formulario y los entry.N de cada pregunta (salen del enlace prellenado).
-const APP_VER = 'v32';
+const APP_VER = 'v33';
 const SUGG = { form: '', name: '', email: '', text: '', meta: '' };
 const TEST_BUILD = /github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
 const suggReady = () => !!(SUGG.form && SUGG.name && SUGG.email && SUGG.text);
@@ -2397,7 +2397,7 @@ document.addEventListener('click', async e => {
     const sa = parseAmount($('#openSaveAmt').value); S.cfg.openingSave = sa === null ? null : { amount: sa, cur }; render(); store.saveCfg(); toast(T('Saldo inicial guardado', 'Starting balance saved')); return;
   }
   const pt = e.target.closest('[data-pet]');
-  if (pt) { const k = pt.dataset.pet; if (LOCK.on) { LOCK.pet = k; lockSave(); } const was = S.cfg.mascot.kind; S.cfg.mascot = { kind: k, name: (was !== k && PETS[k]) ? PETS[k].name : S.cfg.mascot.name }; render(); store.saveCfg(); return; }
+  if (pt) { const k = pt.dataset.pet; if (LOCK.on) { LOCK.pet = k; lockSave(); } appIcon(k); const was = S.cfg.mascot.kind; S.cfg.mascot = { kind: k, name: (was !== k && PETS[k]) ? PETS[k].name : S.cfg.mascot.name }; render(); store.saveCfg(); return; }
   if (e.target.closest('#userSave')) { const n = $('#userName').value.trim(); if (n) { S.cfg.user = { ...(S.cfg.user || {}), name: n }; render(); store.saveCfg(); toast(T(`Listo, ${n}`, `Done, ${n}`)); } return; }
   if (e.target.closest('#gearBtn')) { S.tab = 'ajustes'; render(); window.scrollTo(0, 0); petEvent('tab'); return; }
   if (e.target.closest('#sgSend')) {
@@ -2497,12 +2497,20 @@ if (window.claude && window.claude.use) window.claude.use('downloads').then(d =>
 // Al abrir la app en el navegador, te ofrece instalarla de una vez. Si Chrome no muestra su
 // ventana de instalación, explica cómo hacerlo a mano.
 const INST = { evt: null, shown: false };
+// El ícono de la app es tu mascota: cada una tiene su manifest con sus íconos.
+function appIcon(kind) {
+  if (!TEST_BUILD) return;
+  const k = ['cerdito', 'gato', 'perro', 'guacamaya', 'caiman', 'tigre', 'aguila', 'mosca', 'zancudo'].includes(kind) ? kind : 'cerdito';
+  const set = (rel, href) => { const l = document.querySelector(`link[rel="${rel}"]`); if (l && !l.href.endsWith(href)) l.href = href; };
+  set('manifest', `manifest-${k}.webmanifest`); set('apple-touch-icon', `icons/${k}-180.png`); set('icon', `icons/${k}-192.png`);
+}
 const standalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
 if (TEST_BUILD) {
   const head = document.head || document.getElementsByTagName('head')[0];
   if (head && !document.querySelector('link[rel=manifest]')) {
-    [['manifest', 'manifest.webmanifest'], ['apple-touch-icon', 'icons/apple-touch-icon.png'], ['icon', 'icons/icon-192.png']].forEach(([rel, href]) => { const l = document.createElement('link'); l.rel = rel; l.href = href; head.appendChild(l); });
-    const m = document.createElement('meta'); m.name = 'theme-color'; m.content = '#1d3fa8'; head.appendChild(m);
+    ['manifest', 'apple-touch-icon', 'icon'].forEach(rel => { const l = document.createElement('link'); l.rel = rel; head.appendChild(l); });
+    const m = document.createElement('meta'); m.name = 'theme-color'; m.content = '#16804a'; head.appendChild(m);
+    appIcon(((lsGet('cc.cfg', {}) || {}).mascot || {}).kind);
   }
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
   window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); INST.evt = e; if (INST.shown) instDraw(); });

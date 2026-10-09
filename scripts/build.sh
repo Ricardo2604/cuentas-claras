@@ -7,12 +7,12 @@ mkdir -p "$out"
 {
   printf '<!doctype html>\n<html lang="es">\n<head>\n<meta charset="utf-8">\n'
   printf '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
-  printf '<link rel="manifest" href="manifest.webmanifest">\n'
   # Sin </head><body>: el parser HTML ubica <title>, <style> y el resto donde van.
   cat app/index.html
   printf '\n'
 } > "$out/index.html"
-cp app/manifest.webmanifest "$out/"
+# La app pone el manifest y el ícono de la mascota que elijas; no van aquí.
+cp app/*.webmanifest "$out/"
 cp -r app/icons "$out/"
 # Cada publicación usa una caché nueva, así el teléfono recibe la versión nueva sin subir CACHE a mano.
 ver="$(git rev-parse --short HEAD 2>/dev/null || date +%s)"
