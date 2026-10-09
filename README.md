@@ -3,6 +3,7 @@
 App minimalista para llevar las finanzas personales: gastos e ingresos en Bs o USD, tasas BCV y USDT, ahorro, plan de pagos y consejos sobre qué gastos se pueden recortar.
 
 - `app/index.html`: la app completa en un solo archivo.
+- `app/manifest.webmanifest`, `app/sw.js`, `app/icons/`: lo que permite instalarla en el teléfono. La caché del `sw.js` se renueva sola en cada publicación.
 - `capturas/`: imágenes de apoyo (pasos para Android, etc.).
 - Cada cambio en `main` se publica solo en GitHub Pages (`.github/workflows/pages.yml`).
 

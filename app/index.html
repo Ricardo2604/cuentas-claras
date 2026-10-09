@@ -345,6 +345,11 @@ body.locked .app, body.locked nav.tabs, body.locked #sheetRoot, body.locked #onb
 .lock input { font: inherit; font-size: 22px; text-align: center; letter-spacing: .3em; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); width: 100%; }
 .lock .primary { width: 100%; }
 .lock .linkbtn { justify-self: center; }
+#instRoot .sheet-bg { position: fixed; inset: 0; background: rgba(10, 14, 24, .45); z-index: 60; }
+#instRoot .sheet.inst { position: fixed; left: 0; right: 0; bottom: 0; z-index: 61; background: var(--surface); border-radius: 22px 22px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 12px; max-width: 560px; margin: 0 auto; box-shadow: var(--shadow); animation: up .3s ease-out; }
+.inst-top { display: flex; gap: 12px; align-items: center; }
+.inst-top h2 { margin: 0 0 4px; }
+.inst-pet svg { width: 76px; height: 76px; display: block; }
 .lock .lk-forgot { margin-top: 16px; font-size: 13px; }
 </style>
 
@@ -1421,7 +1426,7 @@ function viewTasas() {
 // ---------- Sugerencias (solo versión de prueba) ----------
 // Se envían a un Google Form de Ricardo; él las ve en la hoja de respuestas.
 // Para conectarlo: pega aquí el id del formulario y los entry.N de cada pregunta (salen del enlace prellenado).
-const APP_VER = 'v30';
+const APP_VER = 'v32';
 const SUGG = { form: '', name: '', email: '', text: '', meta: '' };
 const TEST_BUILD = /github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
 const suggReady = () => !!(SUGG.form && SUGG.name && SUGG.email && SUGG.text);
@@ -1451,7 +1456,7 @@ function viewAjustes() {
   </section>
   ${TEST_BUILD ? `<section class="card sugg"><div class="label">💡 ${T('Sugerencias · versión de prueba', 'Suggestions · test version')}</div>
     <p class="note">${T('¿Algo no funciona, falta algo o se te ocurre una idea? Escríbelo aquí y le llega a Ricardo. Tu Gmail también sirve para darte acceso a la app en Play Store.', 'Something broken or an idea? Write it here.')}</p>
-    <div class="field"><label for="sgName">${T('Tu nombre', 'Your name')}</label><input id="sgName" maxlength="40" value="${esc((lsGet('cc.suggMe', {}) || {}).name || uname())}"></div>
+    <div class="field"><label for="sgName">${T('Tu nombre', 'Your name')}</label><input id="sgName" maxlength="40" autocomplete="name" placeholder="${T('Tu nombre', 'Your name')}" value="${esc((lsGet('cc.suggMe', {}) || {}).name || '')}"></div>
     <div class="field"><label for="sgMail">${T('Tu Gmail', 'Your Gmail')}</label><input id="sgMail" type="email" inputmode="email" autocomplete="email" maxlength="80" placeholder="nombre@gmail.com" value="${esc((lsGet('cc.suggMe', {}) || {}).email || '')}"></div>
     <div class="field"><label for="sgWhere">${T('¿Sobre qué parte?', 'Which part?')}</label><select id="sgWhere">${[T('General', 'General'), T('Inicio', 'Home'), T('Movimientos', 'Entries'), T('Análisis', 'Insights'), T('Me debes / Te debo', 'Loans'), T('Plan', 'Plan'), T('Tasas', 'Rates'), T('Mascota', 'Pet'), T('Bloqueo con huella', 'Lock'), T('Avisos del banco', 'Bank alerts')].map(x => `<option>${esc(x)}</option>`).join('')}</select></div>
     <div class="field"><label for="sgText">${T('Tu sugerencia', 'Your suggestion')}</label><textarea id="sgText" maxlength="1500" placeholder="${T('Ej. Me gustaría poder…', 'e.g. I would like to…')}"></textarea></div>
@@ -2487,6 +2492,51 @@ petIdleLoop();
 if (window.claude && window.claude.use) window.claude.use('sample').then(sm => { SMP = sm; if (sm) sm.limits().then(l => { PM.img = (l && l.images) || null; if (S.tab === 'pagomovil') render(); }).catch(() => {}); }).catch(() => {});
 if (window.claude && window.claude.use) window.claude.use('downloads').then(d => { dl = d; if (d && S.tab === 'movs') render(); }).catch(() => {});
 
+
+// ---------- Instalar en la pantalla de inicio (solo la versión de GitHub) ----------
+// Al abrir la app en el navegador, te ofrece instalarla de una vez. Si Chrome no muestra su
+// ventana de instalación, explica cómo hacerlo a mano.
+const INST = { evt: null, shown: false };
+const standalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+if (TEST_BUILD) {
+  const head = document.head || document.getElementsByTagName('head')[0];
+  if (head && !document.querySelector('link[rel=manifest]')) {
+    [['manifest', 'manifest.webmanifest'], ['apple-touch-icon', 'icons/apple-touch-icon.png'], ['icon', 'icons/icon-192.png']].forEach(([rel, href]) => { const l = document.createElement('link'); l.rel = rel; l.href = href; head.appendChild(l); });
+    const m = document.createElement('meta'); m.name = 'theme-color'; m.content = '#1d3fa8'; head.appendChild(m);
+  }
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); INST.evt = e; if (INST.shown) instDraw(); });
+  window.addEventListener('appinstalled', () => { instClose(); lsSet('cc.instDone', true); toast(T('¡Listo! Cuentas Claras ya está en tu pantalla de inicio.', 'Installed!')); });
+  setTimeout(instMaybe, 1500);
+}
+function instMaybe() {
+  if (standalone() || lsGet('cc.instDone', false)) return;
+  const no = lsGet('cc.instNo', 0); if (no && Date.now() - no < 3 * 864e5) return;
+  // espera a que termine el bloqueo o la bienvenida
+  if (document.body.classList.contains('locked') || ($('#onbRoot') && $('#onbRoot').innerHTML.trim())) return void setTimeout(instMaybe, 800);
+  INST.shown = true; instDraw();
+}
+function instDraw() {
+  let r = document.getElementById('instRoot'); if (!r) { r = document.createElement('div'); r.id = 'instRoot'; document.body.appendChild(r); }
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent);
+  const pet = petOn() ? petSVG(S.cfg.mascot.kind, 'happy') : '';
+  r.innerHTML = `<div class="sheet-bg" data-inst="no"></div><div class="sheet inst" role="dialog" aria-modal="true" aria-labelledby="instT">
+    <div class="inst-top">${pet ? `<span class="inst-pet">${pet}</span>` : ''}<div><h2 id="instT">${T('Instala Cuentas Claras', 'Install Cuentas Claras')}</h2><p class="note">${T('Queda en tu pantalla de inicio como una app: abre con un toque, a pantalla completa y funciona sin internet.', 'Adds it to your home screen like an app.')}</p></div></div>
+    ${INST.evt ? `<button class="primary" data-inst="go">📲 ${T('Instalar ahora', 'Install now')}</button>`
+      : `<ol class="steps">${ios
+        ? `<li>${T('Toca el botón <b>Compartir</b> (el cuadrito con la flecha hacia arriba).', 'Tap Share.')}</li><li>${T('Elige <b>Agregar a inicio</b>.', 'Choose Add to Home Screen.')}</li><li>${T('Toca <b>Agregar</b>.', 'Tap Add.')}</li>`
+        : `<li>${T('Toca los <b>tres puntos ⋮</b> de Chrome, arriba a la derecha.', 'Tap Chrome ⋮ menu.')}</li><li>${T('Elige <b>Instalar app</b> o <b>Agregar a la pantalla principal</b>.', 'Choose Install app.')}</li><li>${T('Confirma con <b>Instalar</b>.', 'Confirm Install.')}</li>`}</ol>
+        <button class="primary" data-inst="ok">${T('Entendido', 'Got it')}</button>`}
+    <button class="linkbtn" data-inst="no" style="justify-self:center">${T('Ahora no', 'Not now')}</button></div>`;
+}
+function instClose() { const r = document.getElementById('instRoot'); if (r) r.remove(); }
+document.addEventListener('click', async e => {
+  const b = e.target.closest && e.target.closest('[data-inst]'); if (!b) return;
+  const a = b.dataset.inst;
+  if (a === 'go' && INST.evt) { const ev = INST.evt; INST.evt = null; ev.prompt(); try { const c = await ev.userChoice; if (c.outcome === 'accepted') { lsSet('cc.instDone', true); instClose(); return; } } catch (err) {} instDraw(); return; }
+  if (a === 'no') lsSet('cc.instNo', Date.now());
+  instClose();
+});
 if (document.body.classList.contains('locked')) { lockDraw(); if (LOCK.cred) setTimeout(() => tryBio(true), 250); }
 window.__cc = { finHealth, finRate, finBreak, fixedDays, viewBalance, planCalc, pmParseText, PM, remDue, remCheck, JOKES, petNext, pockets, savedNet, ONB, petSVG, PET, petPool, parseDate, parseAmount, splitCSV, guessCat, advice, demoData, balanceNow, conv, S };
 })();
