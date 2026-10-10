@@ -1496,7 +1496,7 @@ function viewTasas() {
 // ---------- Sugerencias (solo versión de prueba) ----------
 // Se envían a un Google Form de Ricardo; él las ve en la hoja de respuestas.
 // El formulario tiene dos preguntas (texto y correo): el nombre, la sección y los datos del teléfono van dentro del texto.
-const APP_VER = 'v51';
+const APP_VER = 'v52';
 const SUGG = { form: '1FAIpQLSfxqyUrQ0qfjVElWd7wGnsOfXySq25WfGKISIhriCG8Qs0UQw', email: 'entry.1866519940', text: 'entry.853634718' };
 const TEST_BUILD = /github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
 const suggReady = () => !!(SUGG.form && SUGG.email && SUGG.text);
@@ -1522,10 +1522,37 @@ function openResetSheet() {
     <p class="err" id="rsErr" hidden></p>
     <button class="danger-btn" id="rsGo">${T('Sí, borrar todo y empezar de nuevo', 'Yes, delete everything')}</button>
     <button class="chip-btn" id="rsNo" style="justify-self:center">${T('No, mejor no', 'Cancel')}</button></div></div>`;
-  root.onclick = async e => {
-    if (e.target.id === 'scrim' || e.target.closest('#closeSheet') || e.target.closest('#rsNo')) { sheetClose(root); return; }
-    const go = e.target.closest('#rsGo'); if (!go) return;
-    go.disabled = true; go.textContent = T('Borrando…', 'Deleting…');
+  const GO_TXT = T('Sí, borrar todo y empezar de nuevo', 'Yes, delete everything');
+  const err = m => { const x = $('#rsErr'); if (!x) return; x.textContent = m; x.hidden = !m; };
+  // Con bloqueo activado, el reinicio se completa solo después de la huella (o el PIN de respaldo).
+  const needAuth = !!(LOCK.on && LOCK.pin);
+  const authStep = (mode) => {
+    const body = root.querySelector('.sheet');
+    const bio = mode === 'bio';
+    body.innerHTML = `<div class="grab"></div><div class="sheet-head"><h2 id="rsTitle">${bio ? T('Confirma con tu huella', 'Confirm with your fingerprint') : T('Confirma con tu PIN', 'Confirm with your PIN')}</h2><button class="x" id="closeSheet" aria-label="${T('Cerrar', 'Close')}">×</button></div>
+      <p>${T('Para borrar todo necesito confirmar que eres tú.', 'Confirm it is you to delete everything.')}</p>
+      ${bio ? `<button class="danger-btn" id="rsBio">☝️ ${T('Poner mi huella y borrar', 'Use fingerprint and delete')}</button><button class="chip-btn" id="rsUsePin" style="justify-self:center">${T('Usar mi PIN', 'Use my PIN')}</button>`
+        : `<input id="rsPin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="PIN" aria-label="PIN"><button class="danger-btn" id="rsPinGo">${T('Confirmar y borrar', 'Confirm and delete')}</button>${LOCK.cred ? `<button class="chip-btn" id="rsUseBio" style="justify-self:center">${T('Usar huella', 'Use fingerprint')}</button>` : ''}`}
+      <p class="err" id="rsErr" hidden></p>
+      <button class="chip-btn" id="rsNo" style="justify-self:center">${T('Cancelar', 'Cancel')}</button>`;
+    if (bio) runBio(); else { const i = $('#rsPin'); if (i) i.focus(); }
+  };
+  const runBio = async () => {
+    const btn = $('#rsBio'); if (!btn || btn.disabled) return;
+    btn.disabled = true; btn.textContent = T('Pon tu dedo en el lector…', 'Touch the sensor…'); err('');
+    try { await bioCheck(); await doReset(btn); }
+    catch (x) { const b2 = $('#rsBio'); if (!b2) return; b2.disabled = false; b2.textContent = '☝️ ' + T('Poner mi huella y borrar', 'Use fingerprint and delete'); err(T('No se pudo leer la huella. Intenta de nuevo o usa tu PIN.', 'Could not read the fingerprint. Try again or use your PIN.')); }
+  };
+  const runPin = async () => {
+    const i = $('#rsPin'), btn = $('#rsPinGo'); if (!i || !btn) return;
+    if (Date.now() < LK.until) return err(T('Muchos intentos. Espera 30 segundos.', 'Too many tries. Wait 30 seconds.'));
+    const v = i.value.trim();
+    if (v && await pinHash(v, LOCK.salt) === LOCK.pin) { LK.fails = 0; return doReset(btn); }
+    LK.fails++; if (LK.fails >= 5) { LK.until = Date.now() + 30000; LK.fails = 0; }
+    i.value = ''; i.focus(); err(T('PIN incorrecto.', 'Wrong PIN.'));
+  };
+  const doReset = async (btn) => {
+    btn.disabled = true; btn.textContent = T('Borrando…', 'Deleting…'); err('');
     try {
       if (store.mode === 'db') {
         for (const t of S.tx.slice()) await withRetry(() => store.col.doc(t.id).delete());
@@ -1535,8 +1562,19 @@ function openResetSheet() {
       Object.keys(localStorage).filter(k => k.startsWith('cc.') && !['cc.instDone', 'cc.instNo'].includes(k)).forEach(k => localStorage.removeItem(k));
       try { sessionStorage.clear(); } catch (x) {}
       location.reload();
-    } catch (err) { const m = $('#rsErr'); m.textContent = T('No pude borrar todo. Revisa tu conexión e intenta otra vez.', 'Could not delete everything. Try again.'); m.hidden = false; go.disabled = false; go.textContent = T('Sí, borrar todo y empezar de nuevo', 'Yes, delete everything'); }
+    } catch (x) { err(T('No pude borrar todo. Revisa tu conexión e intenta otra vez.', 'Could not delete everything. Try again.')); btn.disabled = false; btn.textContent = GO_TXT; }
   };
+  root.onclick = async e => {
+    if (e.target.id === 'scrim' || e.target.closest('#closeSheet') || e.target.closest('#rsNo')) { if (LK.ac) LK.ac.abort(); sheetClose(root); return; }
+    if (e.target.closest('#rsBio')) return runBio();
+    if (e.target.closest('#rsPinGo')) return runPin();
+    if (e.target.closest('#rsUsePin')) { if (LK.ac) LK.ac.abort(); return authStep('pin'); }
+    if (e.target.closest('#rsUseBio')) return authStep('bio');
+    const go = e.target.closest('#rsGo'); if (!go) return;
+    if (needAuth) return authStep(LOCK.cred ? 'bio' : 'pin');
+    doReset(go);
+  };
+  root.onkeyup = e => { if (e.key === 'Enter' && e.target.id === 'rsPin') runPin(); };
   root.onkeydown = e => { if (e.key === 'Escape') sheetClose(root); };
 }
 function viewAjustes() {
