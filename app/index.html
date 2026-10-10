@@ -79,6 +79,16 @@ header.top { gap: 8px !important; }
 header.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 4px; min-height: 40px; }
 .brand { font-family: var(--f-display); font-weight: 700; font-size: 20px; letter-spacing: -.01em; }
 .brand small { display: block; font-family: var(--f-body); font-weight: 500; font-size: 12px; color: var(--ink-3); letter-spacing: .02em; }
+/* Logo: marca verde con moneda y check + nombre en dos tonos. Solo se ve en Inicio. */
+.brand { display: flex; align-items: center; gap: 9px; }
+.logo-mark { width: 32px; height: 32px; flex: none; filter: drop-shadow(0 2px 4px rgba(18, 122, 69, .25)); }
+.logo-word { display: flex; flex-direction: column; line-height: .95; }
+.logo-word b { font-weight: 700; font-size: 17px; letter-spacing: -.02em; color: var(--ink); }
+.logo-word i { font-style: normal; font-weight: 500; font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: #16804a; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .logo-word i { color: #3ccf86; } }
+:root[data-theme="dark"] .logo-word i { color: #3ccf86; }
+body:not([data-tab="inicio"]) .brand { display: none; }
+header.top .gear { margin-left: auto; }
 .month { display: flex; align-items: center; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 2px; }
 .month button { border: 0; background: none; width: 34px; height: 34px; border-radius: 999px; font-size: 18px; color: var(--ink-2); }
 .month button:hover { background: var(--surface-2); }
@@ -359,7 +369,7 @@ body.locked .app, body.locked nav.tabs, body.locked #sheetRoot, body.locked #onb
 
 <div class="app">
   <header class="top">
-    <div class="brand">Cuentas Claras</div>
+    <div class="brand" aria-label="Cuentas Claras"><svg class="logo-mark" viewBox="0 0 40 40" aria-hidden="true"><defs><linearGradient id="lgG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2bb673"/><stop offset="1" stop-color="#127a45"/></linearGradient></defs><rect width="40" height="40" rx="11" fill="url(#lgG)"/><circle cx="20" cy="20" r="11.5" fill="none" stroke="#fff" stroke-width="2.6" opacity=".95"/><path d="M14.6 20.4l3.7 3.7 7.3-8" fill="none" stroke="#f4c430" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="logo-word"><b>Cuentas</b><i>Claras</i></span></div>
     <div class="month" id="monthBox">
       <button id="prevM" aria-label="‹">‹</button>
       <span id="monthLbl" class="num"></span>
@@ -1259,6 +1269,7 @@ const TABS = [
 const PARENT = { balance: 'inicio', consejos: 'inicio', importar: 'movs', pagomovil: 'movs' };
 function render() {
   document.title = 'Cuentas Claras';
+  document.body.dataset.tab = S.tab;
   $('#monthLbl').textContent = monthName(S.month);
   $('#prevM').setAttribute('aria-label', T('Mes anterior', 'Previous month')); $('#nextM').setAttribute('aria-label', T('Mes siguiente', 'Next month'));
   $('#monthBox').hidden = !['inicio', 'movs', 'consejos', 'balance', 'fin'].includes(S.tab) || (S.tab === 'fin' && FINSUB.t !== 'analisis');
@@ -1441,7 +1452,7 @@ function viewTasas() {
 // ---------- Sugerencias (solo versión de prueba) ----------
 // Se envían a un Google Form de Ricardo; él las ve en la hoja de respuestas.
 // Para conectarlo: pega aquí el id del formulario y los entry.N de cada pregunta (salen del enlace prellenado).
-const APP_VER = 'v40';
+const APP_VER = 'v41';
 const SUGG = { form: '', name: '', email: '', text: '', meta: '' };
 const TEST_BUILD = /github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
 const suggReady = () => !!(SUGG.form && SUGG.name && SUGG.email && SUGG.text);
