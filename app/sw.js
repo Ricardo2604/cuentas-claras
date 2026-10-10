@@ -1,8 +1,9 @@
 // Cuentas Claras: guarda la app en el teléfono para que abra rápido y sin conexión.
 // Sube CACHE cada vez que publiques una versión nueva.
-const CACHE = 'cc-v49';
+const CACHE = 'cc-v50';
 const FONTS = 'cc-fonts'; // las letras de Google se guardan aparte y sobreviven a las versiones nuevas
 const PREF = 'cc-pref';   // aquí se recuerda la mascota elegida para el ícono
+const OCR = 'cc-ocr';     // lector de capturas (Tesseract): se baja una vez y queda para usar sin internet
 const PETS = ['cerdito', 'gato', 'perro', 'guacamaya', 'caiman', 'tigre', 'aguila', 'mosca', 'zancudo'];
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/app-192.png', './icons/app-512.png', './icons/app-maskable.png',
   ...PETS.flatMap(p => ['192', '512', 'maskable', '180'].map(s => `./icons/${p}-${s}.png`))];
@@ -13,7 +14,7 @@ self.addEventListener('install', e => {
 });
 
 self.addEventListener('activate', e => {
-  const keep = [CACHE, FONTS, PREF];
+  const keep = [CACHE, FONTS, PREF, OCR];
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => !keep.includes(k)).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
 
@@ -35,6 +36,11 @@ self.addEventListener('fetch', e => {
   // Letras de Google: lo guardado primero, y se refresca en segundo plano.
   if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
     e.respondWith(caches.match(req).then(hit => { const net = fromNet(req, FONTS).catch(() => hit); return hit || net; }));
+    return;
+  }
+  // Lector de capturas: lo guardado primero (los archivos no cambian dentro de una versión).
+  if ((url.hostname === 'cdn.jsdelivr.net' && /\/(tesseract\.js|tesseract\.js-core)@/.test(url.pathname)) || url.hostname === 'tessdata.projectnaptha.com') {
+    e.respondWith(caches.match(req).then(hit => hit || fromNet(req, OCR)));
     return;
   }
   if (url.origin !== location.origin) return; // tasas, formularios, etc. van directo
