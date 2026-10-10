@@ -1413,9 +1413,6 @@ function viewTasas() {
     ? [[T('A tasa BCV', 'At BCV rate'), money(amt * b.rate, 'VES', 2)], [T('A tasa USDT', 'At USDT rate'), money(amt * u.rate, 'VES', 2)], [T('Diferencia', 'Difference'), money(amt * (u.rate - b.rate), 'VES', 2)]]
     : [[T('A tasa BCV', 'At BCV rate'), money(amt / b.rate, 'USD', 2)], [T('A tasa USDT', 'At USDT rate'), money(amt / u.rate, 'USD', 2)], [T('Diferencia', 'Difference'), money(amt / b.rate - amt / u.rate, 'USD', 2)]];
   return `${petPanel(true)}
-  <section class="card"><h2>${T('Tasas del dólar', 'Dollar rates')}</h2>
-    <p class="note">${T('Se actualizan solas varias veces al día. Si tu banco o tu casa de cambio usan otra, pon la tuya.', 'They update on their own several times a day. If your bank or exchange uses another, set your own.')}</p>
-  </section>
   <div class="rates">
     ${card('bcv', b, T('Dólar BCV', 'BCV dollar'), b.date ? T('Oficial del ', 'Official for ') + esc(b.date) : T('Oficial', 'Official'))}
     ${card('usdt', u, 'Dólar USDT', 'Binance P2P')}
@@ -1445,7 +1442,7 @@ function viewTasas() {
 // ---------- Sugerencias (solo versión de prueba) ----------
 // Se envían a un Google Form de Ricardo; él las ve en la hoja de respuestas.
 // Para conectarlo: pega aquí el id del formulario y los entry.N de cada pregunta (salen del enlace prellenado).
-const APP_VER = 'v35';
+const APP_VER = 'v36';
 const SUGG = { form: '', name: '', email: '', text: '', meta: '' };
 const TEST_BUILD = /github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
 const suggReady = () => !!(SUGG.form && SUGG.name && SUGG.email && SUGG.text);
