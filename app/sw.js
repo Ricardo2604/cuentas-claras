@@ -1,6 +1,6 @@
 // Cuentas Claras: guarda la app en el teléfono para que abra rápido y sin conexión.
 // Sube CACHE cada vez que publiques una versión nueva.
-const CACHE = 'cc-v36';
+const CACHE = 'cc-v37';
 const FONTS = 'cc-fonts'; // las letras de Google se guardan aparte y sobreviven a las versiones nuevas
 const PREF = 'cc-pref';   // aquí se recuerda la mascota elegida para el ícono
 const PETS = ['cerdito', 'gato', 'perro', 'guacamaya', 'caiman', 'tigre', 'aguila', 'mosca', 'zancudo'];

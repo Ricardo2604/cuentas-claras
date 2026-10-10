@@ -1413,6 +1413,14 @@ function viewTasas() {
     ? [[T('A tasa BCV', 'At BCV rate'), money(amt * b.rate, 'VES', 2)], [T('A tasa USDT', 'At USDT rate'), money(amt * u.rate, 'VES', 2)], [T('Diferencia', 'Difference'), money(amt * (u.rate - b.rate), 'VES', 2)]]
     : [[T('A tasa BCV', 'At BCV rate'), money(amt / b.rate, 'USD', 2)], [T('A tasa USDT', 'At USDT rate'), money(amt / u.rate, 'USD', 2)], [T('Diferencia', 'Difference'), money(amt / b.rate - amt / u.rate, 'USD', 2)]];
   return `${petPanel(true)}
+  <section class="card"><h2>${T('Convertidor', 'Converter')}</h2>
+    <div class="amount"><input id="convAmt" inputmode="decimal" value="${esc(CONV.amount)}" aria-label="${T('Monto', 'Amount')}">
+      <span class="curtog"><button data-conv-from="USD" aria-pressed="${CONV.from === 'USD'}">$</button><button data-conv-from="VES" aria-pressed="${CONV.from === 'VES'}">Bs</button></span></div>
+    <div class="conv-out num" id="convOut">${out.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>
+    <div class="field"><span class="flabel">${T('Tasa para tus resúmenes', 'Rate for your summaries')}</span>
+      <span class="seg"><button data-cfg="convRate:bcv" aria-pressed="${S.cfg.convRate === 'bcv'}">BCV</button><button data-cfg="convRate:usdt" aria-pressed="${S.cfg.convRate === 'usdt'}">USDT</button></span>
+      <span class="note">${T('Se usa para sumar gastos hechos en $ y en Bs. Cada movimiento guarda la tasa del día en que lo anotaste.', 'Used to add up entries made in $ and Bs. Each entry keeps the rate from the day you logged it.')}</span></div>
+  </section>
   <div class="rates">
     ${card('bcv', b, T('Dólar BCV', 'BCV dollar'), b.date ? T('Oficial del ', 'Official for ') + esc(b.date) : T('Oficial', 'Official'))}
     ${card('usdt', u, 'Dólar USDT', 'Binance P2P')}
@@ -1427,14 +1435,7 @@ function viewTasas() {
       ${S.cfg.manualRates[rateEdit] ? `<button class="linkbtn" id="rateAuto">${T('Volver a la tasa automática', 'Back to the automatic rate')}</button>` : ''}</div>` : ''}
     <p class="note">${T('Fuentes:', 'Sources:')} <a href="https://www.bcv.org.ve/" target="_blank" rel="noopener">bcv.org.ve</a> · <a href="https://p2p.binance.com/" target="_blank" rel="noopener">Binance P2P</a></p>
   </section>
-  <section class="card"><h2>${T('Convertidor', 'Converter')}</h2>
-    <div class="amount"><input id="convAmt" inputmode="decimal" value="${esc(CONV.amount)}" aria-label="${T('Monto', 'Amount')}">
-      <span class="curtog"><button data-conv-from="USD" aria-pressed="${CONV.from === 'USD'}">$</button><button data-conv-from="VES" aria-pressed="${CONV.from === 'VES'}">Bs</button></span></div>
-    <div class="conv-out num" id="convOut">${out.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>
-    <div class="field"><span class="flabel">${T('Tasa para tus resúmenes', 'Rate for your summaries')}</span>
-      <span class="seg"><button data-cfg="convRate:bcv" aria-pressed="${S.cfg.convRate === 'bcv'}">BCV</button><button data-cfg="convRate:usdt" aria-pressed="${S.cfg.convRate === 'usdt'}">USDT</button></span>
-      <span class="note">${T('Se usa para sumar gastos hechos en $ y en Bs. Cada movimiento guarda la tasa del día en que lo anotaste.', 'Used to add up entries made in $ and Bs. Each entry keeps the rate from the day you logged it.')}</span></div>
-  </section>`;
+`;
 }
 
 // ---------- Ajustes ----------
@@ -1442,7 +1443,7 @@ function viewTasas() {
 // ---------- Sugerencias (solo versión de prueba) ----------
 // Se envían a un Google Form de Ricardo; él las ve en la hoja de respuestas.
 // Para conectarlo: pega aquí el id del formulario y los entry.N de cada pregunta (salen del enlace prellenado).
-const APP_VER = 'v36';
+const APP_VER = 'v37';
 const SUGG = { form: '', name: '', email: '', text: '', meta: '' };
 const TEST_BUILD = /github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
 const suggReady = () => !!(SUGG.form && SUGG.name && SUGG.email && SUGG.text);
