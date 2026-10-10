@@ -1493,7 +1493,7 @@ function viewTasas() {
 // ---------- Sugerencias (solo versión de prueba) ----------
 // Se envían a un Google Form de Ricardo; él las ve en la hoja de respuestas.
 // Para conectarlo: pega aquí el id del formulario y los entry.N de cada pregunta (salen del enlace prellenado).
-const APP_VER = 'v46';
+const APP_VER = 'v47';
 const SUGG = { form: '', name: '', email: '', text: '', meta: '' };
 const TEST_BUILD = /github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
 const suggReady = () => !!(SUGG.form && SUGG.name && SUGG.email && SUGG.text);
@@ -2365,11 +2365,15 @@ const debtRemDue = d => d.dir === 'owe_me' && d.remind && d.due && debtLeft(d) >
 const waLink = d => `https://wa.me/${waNum(d.phone)}?text=${encodeURIComponent(debtMsg(d))}`;
 const WA_ICO = '<svg class="wa-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.2A9.8 9.8 0 0 0 3.6 17l-1.3 4.8 4.9-1.3A9.8 9.8 0 1 0 12 2.2Zm0 17.9c-1.5 0-2.9-.4-4.2-1.1l-.3-.2-2.9.8.8-2.8-.2-.3A8.1 8.1 0 1 1 12 20.1Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1-.7-.3-1.4-.7-2-1.3-.5-.5-1-1.1-1.3-1.7-.1-.2 0-.4.1-.5l.4-.4.2-.4v-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3c-.3.3-1 1-1 2.3s1 2.7 1.2 2.9c.1.2 2 3.1 4.9 4.3 1.8.8 2.5.8 3.4.7.5-.1 1.5-.6 1.8-1.2.2-.6.2-1.1.1-1.2l-.4-.3Z"/></svg>';
 function debtMsg(d) {
-  const n = uname(); const left = money(debtLeft(d), d.cur);
+  // Lo "firma" Cuentas Claras como aviso automático, para que no parezca que la persona está cobrando.
+  const n = uname() || T('quien te prestó', 'your lender'), who = uname() || T('quien te prestó', 'your lender'); const left = money(debtLeft(d), d.cur);
+  const dd = debtDays(d); const f = d.due ? d.due.slice(8, 10) + '/' + d.due.slice(5, 7) : '';
+  const vence = !d.due ? T('tienes pendiente', 'you have pending') : dd === 0 ? T(`hoy ${f} vence`, `today ${f} is due`) : dd > 0 ? T(`el ${f} vence`, `on ${f} is due`) : T(`venció el ${f}`, `was due ${f}`);
+  const cuando = !d.due ? '' : dd === 0 ? T(` de hoy ${f}`, ` due today`) : dd > 0 ? T(` del ${f}`, ` due ${f}`) : T(` que venció el ${f}`, ` overdue since ${f}`);
   return rnd([
-    T(`¡Hola ${d.person}! Espero que estés muy bien. Te escribo para recordarte lo de los ${left}${d.due ? `, que quedamos para el ${dfmt(d.due)}` : ''}. Avísame cuando puedas. ¡Un abrazo!${n ? ' ' + n : ''}`, `Hi ${d.person}! Just a reminder about the ${left}. Thanks!`),
-    T(`Epa ${d.person}, ¿cómo vas? Te paso el recordatorio de los ${left}${d.due ? ` (era para el ${dfmt(d.due)})` : ''}. Sin presión, pero con fecha 😄`, `Hey ${d.person}, friendly reminder about ${left}.`),
-    T(`Hola ${d.person}, mi alcancía me pidió que te recordara los ${left}. Dice que te extraña. Avísame cuándo puedes 🐷`, `Hi ${d.person}, my piggy bank misses the ${left} 🐷`),
+    T(`🔔 *Recordatorio automático de Cuentas Claras*\nHola ${d.person}, este es un aviso automático: ${!d.due ? `tienes pendiente el pago de ${left} a ${who}` : dd < 0 ? `el pago de ${left} a ${who} venció el ${f}` : `${vence} el pago de ${left} a ${who}`}. Si ya lo hiciste, ignora este mensaje. ¡Gracias! 🙌`, `🔔 Cuentas Claras reminder: ${d.person}, a payment of ${left} to ${who} ${vence}.`),
+    T(`🔔 *Cuentas Claras* te recuerda:\nHola ${d.person} 👋 Tienes pendiente ${left} con ${n}${d.due ? (dd < 0 ? `, que venció el ${f}` : dd === 0 ? ` para hoy ${f}` : ` para el ${f}`) : ''}. Es un mensaje automático, ${n} no tiene que hacer nada. ¡Que tengas buen día!`, `🔔 Cuentas Claras: ${d.person}, you owe ${left} to ${n}. Automatic message.`),
+    T(`🔔 *Aviso de Cuentas Claras*\n${d.person}, la app de ${n} nos pidió recordarte el pago de ${left}${cuando}. Cuando lo hagas, avísale para marcarlo como pagado. ¡Gracias! 😊`, `🔔 Cuentas Claras: ${d.person}, reminder of the ${left} payment${cuando}.`),
   ]);
 }
 function openDebtSheet(mode, d) {
