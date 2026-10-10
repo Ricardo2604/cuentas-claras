@@ -3,7 +3,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600&family=Comic+Neue:wght@700&display=swap">
+<!-- Las letras se cargan sin frenar el arranque: sin internet la app abre igual con las letras del teléfono. -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600&family=Comic+Neue:wght@700&display=swap" media="print" onload="this.media='all'">
 <style>
 /* Layout: one-column phone app, fixed bottom tab bar + floating add button; sheets slide up from the bottom. */
 :root {
@@ -405,7 +406,10 @@ async function bioCreate(name) {
   if (!c) throw new Error('cancel'); return b64u(c.rawId);
 }
 async function bioCheck() {
-  const a = await navigator.credentials.get({ publicKey: { challenge: rnd32(), allowCredentials: [{ type: 'public-key', id: ub64u(LOCK.cred), transports: ['internal'] }], userVerification: 'required', timeout: 60000 } });
+  // Si el teléfono no responde (pasa al abrir la app instalada), se cancela solo y el botón sigue disponible.
+  const ac = new AbortController(); LK.ac = ac; const t = setTimeout(() => ac.abort(), 20000);
+  let a; try { a = await navigator.credentials.get({ signal: ac.signal, publicKey: { challenge: rnd32(), allowCredentials: [{ type: 'public-key', id: ub64u(LOCK.cred), transports: ['internal'] }], userVerification: 'required', timeout: 20000 } }); }
+  finally { clearTimeout(t); if (LK.ac === ac) LK.ac = null; }
   if (!a) throw new Error('cancel');
   if (!(new Uint8Array(a.response.authenticatorData)[32] & 4)) throw new Error('uv'); // el teléfono confirmó que eras tú
 }
@@ -414,7 +418,7 @@ function lockDraw() {
   let r = document.getElementById('lockRoot'); if (!r) { r = document.createElement('div'); r.id = 'lockRoot'; document.body.appendChild(r); }
   const mode = LOCK.cred ? LK.mode : 'pin';
   r.innerHTML = `<div class="lock" role="dialog" aria-modal="true" aria-labelledby="lkTitle">${lockScene(LK.err ? 'sad' : 'happy')}<h2 id="lkTitle">Cuentas Claras</h2><p class="note">Tus cuentas están protegidas.</p>
-    ${mode === 'bio' ? `<button class="primary" id="lkBio" ${LK.busy ? 'disabled' : ''}>☝️ Desbloquear con huella</button><button class="linkbtn" id="lkUsePin">Usar mi PIN</button>`
+    ${mode === 'bio' ? `<button class="primary" id="lkBio">☝️ ${LK.busy ? 'Pon tu dedo en el lector…' : 'Desbloquear con huella'}</button><button class="linkbtn" id="lkUsePin">Usar mi PIN</button>`
       : `<input id="lkPin" type="password" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="PIN" aria-label="PIN"><button class="primary" id="lkPinGo">Entrar</button>${LOCK.cred ? '<button class="linkbtn" id="lkUseBio">Usar huella</button>' : ''}`}
     ${LK.err ? `<p class="err" role="alert">${LK.err}</p>` : ''}
     <button class="linkbtn lk-forgot" id="lkForgot">Olvidé mi PIN</button></div>`;
@@ -437,10 +441,21 @@ function unlock() {
   setTimeout(() => r.remove(), still ? 0 : 1450);
 }
 async function tryBio(silent) {
-  if (LK.busy) return; LK.busy = true; LK.err = ''; lockDraw();
-  try { await bioCheck(); LK.busy = false; unlock(); }
-  catch (e) { LK.busy = false; LK.err = silent ? '' : 'No se pudo leer la huella. Intenta de nuevo o usa tu PIN.'; lockDraw(); }
+  if (LK.busy) { if (silent) return; if (LK.ac) LK.ac.abort(); await new Promise(r => setTimeout(r, 150)); } // un toque nuevo reinicia la lectura
+  const run = (LK.run || 0) + 1; LK.run = run; LK.busy = true; LK.err = ''; lockDraw();
+  try { await bioCheck(); if (LK.run !== run) return; LK.busy = false; unlock(); }
+  catch (e) { if (LK.run !== run) return; LK.busy = false; LK.err = silent ? '' : 'No se pudo leer la huella. Intenta de nuevo o usa tu PIN.'; if (document.getElementById('lockRoot')) lockDraw(); }
 }
+// Pide la huella sola solo cuando la app ya se ve en pantalla (no durante el arranque).
+function bioAuto() {
+  const go = () => {
+    if (document.visibilityState !== 'visible' || !document.body.classList.contains('locked')) return;
+    document.removeEventListener('visibilitychange', go);
+    requestAnimationFrame(() => setTimeout(() => { if (document.body.classList.contains('locked') && LK.mode === 'bio') tryBio(true); }, 600));
+  };
+  document.addEventListener('visibilitychange', go); go();
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && LK.ac) LK.ac.abort(); });
 async function tryPin(v) {
   if (Date.now() < LK.until) { LK.err = 'Muchos intentos. Espera 30 segundos.'; return lockDraw(); }
   if (LOCK.pin && v && await pinHash(v, LOCK.salt) === LOCK.pin) return unlock();
@@ -1430,7 +1445,7 @@ function viewTasas() {
 // ---------- Sugerencias (solo versión de prueba) ----------
 // Se envían a un Google Form de Ricardo; él las ve en la hoja de respuestas.
 // Para conectarlo: pega aquí el id del formulario y los entry.N de cada pregunta (salen del enlace prellenado).
-const APP_VER = 'v34';
+const APP_VER = 'v35';
 const SUGG = { form: '', name: '', email: '', text: '', meta: '' };
 const TEST_BUILD = /github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
 const suggReady = () => !!(SUGG.form && SUGG.name && SUGG.email && SUGG.text);
@@ -2506,7 +2521,10 @@ function appIcon(kind) {
   if (!TEST_BUILD) return;
   const k = ['cerdito', 'gato', 'perro', 'guacamaya', 'caiman', 'tigre', 'aguila', 'mosca', 'zancudo'].includes(kind) ? kind : 'cerdito';
   const set = (rel, href) => { const l = document.querySelector(`link[rel="${rel}"]`); if (l && !l.href.endsWith(href)) l.href = href; };
-  set('manifest', `manifest-${k}.webmanifest`); set('apple-touch-icon', `icons/${k}-180.png`); set('icon', `icons/${k}-192.png`);
+  set('manifest', 'manifest.webmanifest'); set('apple-touch-icon', `icons/${k}-180.png`); set('icon', `icons/${k}-192.png`);
+  // El ícono instalado vive en icons/app-*.png; el service worker entrega ahí la mascota elegida,
+  // así Chrome la toma en su próxima revisión del ícono sin reinstalar.
+  if ('serviceWorker' in navigator) navigator.serviceWorker.ready.then(r => r.active && r.active.postMessage({ pet: k })).catch(() => {});
 }
 const standalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
 if (TEST_BUILD) {
@@ -2549,7 +2567,7 @@ document.addEventListener('click', async e => {
   if (a === 'no') lsSet('cc.instNo', Date.now());
   instClose();
 });
-if (document.body.classList.contains('locked')) { lockDraw(); if (LOCK.cred) setTimeout(() => tryBio(true), 250); }
+if (document.body.classList.contains('locked')) { lockDraw(); if (LOCK.cred) bioAuto(); }
 window.__cc = { finHealth, finRate, finBreak, fixedDays, viewBalance, planCalc, pmParseText, PM, remDue, remCheck, JOKES, petNext, pockets, savedNet, ONB, petSVG, PET, petPool, parseDate, parseAmount, splitCSV, guessCat, advice, demoData, balanceNow, conv, S };
 })();
 </script>
