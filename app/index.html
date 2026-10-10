@@ -1418,8 +1418,7 @@ function viewTasas() {
       <span class="curtog"><button data-conv-from="USD" aria-pressed="${CONV.from === 'USD'}">$</button><button data-conv-from="VES" aria-pressed="${CONV.from === 'VES'}">Bs</button></span></div>
     <div class="conv-out num" id="convOut">${out.map(([k, v]) => `<div><span>${k}</span><b>${v}</b></div>`).join('')}</div>
     <div class="field"><span class="flabel">${T('Tasa para tus resúmenes', 'Rate for your summaries')}</span>
-      <span class="seg"><button data-cfg="convRate:bcv" aria-pressed="${S.cfg.convRate === 'bcv'}">BCV</button><button data-cfg="convRate:usdt" aria-pressed="${S.cfg.convRate === 'usdt'}">USDT</button></span>
-      <span class="note">${T('Se usa para sumar gastos hechos en $ y en Bs. Cada movimiento guarda la tasa del día en que lo anotaste.', 'Used to add up entries made in $ and Bs. Each entry keeps the rate from the day you logged it.')}</span></div>
+      <span class="seg"><button data-cfg="convRate:bcv" aria-pressed="${S.cfg.convRate === 'bcv'}">BCV</button><button data-cfg="convRate:usdt" aria-pressed="${S.cfg.convRate === 'usdt'}">USDT</button></span></div>
   </section>
   <div class="rates">
     ${card('bcv', b, T('Dólar BCV', 'BCV dollar'), b.date ? T('Oficial del ', 'Official for ') + esc(b.date) : T('Oficial', 'Official'))}
@@ -1443,7 +1442,7 @@ function viewTasas() {
 // ---------- Sugerencias (solo versión de prueba) ----------
 // Se envían a un Google Form de Ricardo; él las ve en la hoja de respuestas.
 // Para conectarlo: pega aquí el id del formulario y los entry.N de cada pregunta (salen del enlace prellenado).
-const APP_VER = 'v38';
+const APP_VER = 'v39';
 const SUGG = { form: '', name: '', email: '', text: '', meta: '' };
 const TEST_BUILD = /github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
 const suggReady = () => !!(SUGG.form && SUGG.name && SUGG.email && SUGG.text);
