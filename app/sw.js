@@ -1,6 +1,6 @@
 // Cuentas Claras: guarda la app en el teléfono para que abra rápido y sin conexión.
 // Sube CACHE cada vez que publiques una versión nueva.
-const CACHE = 'cc-v33';
+const CACHE = 'cc-v34';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/cerdito-192.png', './icons/cerdito-512.png', './icons/cerdito-maskable.png', './icons/cerdito-180.png'];
 
 self.addEventListener('install', e => {
