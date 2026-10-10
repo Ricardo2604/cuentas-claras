@@ -1493,7 +1493,7 @@ function viewTasas() {
 // ---------- Sugerencias (solo versión de prueba) ----------
 // Se envían a un Google Form de Ricardo; él las ve en la hoja de respuestas.
 // Para conectarlo: pega aquí el id del formulario y los entry.N de cada pregunta (salen del enlace prellenado).
-const APP_VER = 'v47';
+const APP_VER = 'v48';
 const SUGG = { form: '', name: '', email: '', text: '', meta: '' };
 const TEST_BUILD = /github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
 const suggReady = () => !!(SUGG.form && SUGG.name && SUGG.email && SUGG.text);
@@ -2362,7 +2362,13 @@ const CONTACTS_OK = !!(navigator.contacts && navigator.contacts.select);
 // Recordatorio programado: aparece en Inicio desde el día prometido mientras la deuda siga sin pagar.
 // Tras enviarlo, si sigue sin pagar vuelve a aparecer cada 3 días.
 const debtRemDue = d => d.dir === 'owe_me' && d.remind && d.due && debtLeft(d) > 0 && debtDays(d) <= 0 && (!d.remSent || (Date.now() - new Date(d.remSent + 'T00:00')) / 864e5 >= 3);
-const waLink = d => `https://wa.me/${waNum(d.phone)}?text=${encodeURIComponent(debtMsg(d))}`;
+// En Android se abre directo el WhatsApp normal (com.whatsapp), no WhatsApp Business.
+// Si no lo tiene instalado, Chrome usa el enlace wa.me de respaldo. En otros teléfonos, wa.me.
+const IS_ANDROID = /Android/i.test(navigator.userAgent);
+const waLink = d => {
+  const num = waNum(d.phone), txt = encodeURIComponent(debtMsg(d)), web = `https://wa.me/${num}?text=${txt}`;
+  return IS_ANDROID ? `intent://send/?${num ? `phone=${num}&` : ''}text=${txt}#Intent;scheme=whatsapp;package=com.whatsapp;S.browser_fallback_url=${encodeURIComponent(web)};end` : web;
+};
 const WA_ICO = '<svg class="wa-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.2A9.8 9.8 0 0 0 3.6 17l-1.3 4.8 4.9-1.3A9.8 9.8 0 1 0 12 2.2Zm0 17.9c-1.5 0-2.9-.4-4.2-1.1l-.3-.2-2.9.8.8-2.8-.2-.3A8.1 8.1 0 1 1 12 20.1Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1-.7-.3-1.4-.7-2-1.3-.5-.5-1-1.1-1.3-1.7-.1-.2 0-.4.1-.5l.4-.4.2-.4v-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3c-.3.3-1 1-1 2.3s1 2.7 1.2 2.9c.1.2 2 3.1 4.9 4.3 1.8.8 2.5.8 3.4.7.5-.1 1.5-.6 1.8-1.2.2-.6.2-1.1.1-1.2l-.4-.3Z"/></svg>';
 function debtMsg(d) {
   // Lo "firma" Cuentas Claras como aviso automático, para que no parezca que la persona está cobrando.
