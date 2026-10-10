@@ -359,7 +359,7 @@ body.locked .app, body.locked nav.tabs, body.locked #sheetRoot, body.locked #onb
 
 <div class="app">
   <header class="top">
-    <div class="brand">Cuentas Claras<small id="saveMode"></small></div>
+    <div class="brand">Cuentas Claras</div>
     <div class="month" id="monthBox">
       <button id="prevM" aria-label="‹">‹</button>
       <span id="monthLbl" class="num"></span>
@@ -1259,7 +1259,6 @@ const TABS = [
 const PARENT = { balance: 'inicio', consejos: 'inicio', importar: 'movs', pagomovil: 'movs' };
 function render() {
   document.title = 'Cuentas Claras';
-  $('#saveMode').textContent = !S.loaded ? T('Cargando…', 'Loading…') : store.mode === 'db' ? T('Guardado en tu cuenta', 'Saved to your account') : T('Guardado solo en este teléfono', 'Saved on this phone only');
   $('#monthLbl').textContent = monthName(S.month);
   $('#prevM').setAttribute('aria-label', T('Mes anterior', 'Previous month')); $('#nextM').setAttribute('aria-label', T('Mes siguiente', 'Next month'));
   $('#monthBox').hidden = !['inicio', 'movs', 'consejos', 'balance', 'fin'].includes(S.tab) || (S.tab === 'fin' && FINSUB.t !== 'analisis');
@@ -1442,7 +1441,7 @@ function viewTasas() {
 // ---------- Sugerencias (solo versión de prueba) ----------
 // Se envían a un Google Form de Ricardo; él las ve en la hoja de respuestas.
 // Para conectarlo: pega aquí el id del formulario y los entry.N de cada pregunta (salen del enlace prellenado).
-const APP_VER = 'v39';
+const APP_VER = 'v40';
 const SUGG = { form: '', name: '', email: '', text: '', meta: '' };
 const TEST_BUILD = /github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
 const suggReady = () => !!(SUGG.form && SUGG.name && SUGG.email && SUGG.text);
