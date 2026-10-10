@@ -1492,13 +1492,13 @@ function viewTasas() {
 
 // ---------- Sugerencias (solo versión de prueba) ----------
 // Se envían a un Google Form de Ricardo; él las ve en la hoja de respuestas.
-// Para conectarlo: pega aquí el id del formulario y los entry.N de cada pregunta (salen del enlace prellenado).
-const APP_VER = 'v48';
-const SUGG = { form: '', name: '', email: '', text: '', meta: '' };
+// El formulario tiene dos preguntas (texto y correo): el nombre, la sección y los datos del teléfono van dentro del texto.
+const APP_VER = 'v49';
+const SUGG = { form: '1FAIpQLSfxqyUrQ0qfjVElWd7wGnsOfXySq25WfGKISIhriCG8Qs0UQw', email: 'entry.1866519940', text: 'entry.853634718' };
 const TEST_BUILD = /github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
-const suggReady = () => !!(SUGG.form && SUGG.name && SUGG.email && SUGG.text);
+const suggReady = () => !!(SUGG.form && SUGG.email && SUGG.text);
 async function suggPost(x) {
-  const f = new URLSearchParams(); f.set(SUGG.name, x.name); f.set(SUGG.email, x.email); f.set(SUGG.text, x.text); if (SUGG.meta) f.set(SUGG.meta, x.meta);
+  const f = new URLSearchParams(); f.set(SUGG.email, x.email); f.set(SUGG.text, `${x.text}\n\n— ${x.name}${x.meta ? ' · ' + x.meta : ''}`);
   // Google Forms no responde a otras páginas: con no-cors se envía igual, aunque no podamos leer la respuesta.
   await fetch(`https://docs.google.com/forms/d/e/${SUGG.form}/formResponse`, { method: 'POST', mode: 'no-cors', body: f });
 }
