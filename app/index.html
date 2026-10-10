@@ -258,6 +258,13 @@ p { margin: 0; }
 .tools { display: flex; gap: 8px; flex-wrap: wrap; }
 .chip-btn.wa-btn { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; background: #e7f8ee; border-color: #9fdcb8; color: #0d6b3a; }
 .wa-ico { width: 17px; height: 17px; flex: none; }
+.rem-tog { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 12px 14px; border-radius: 14px; border: 1.5px dashed #9fdcb8; background: transparent; color: #0d6b3a; font-size: 15px; font-weight: 600; }
+.rem-tog[aria-pressed="true"] { border-style: solid; background: #e7f8ee; }
+.rem-tog .wa-ico { width: 22px; height: 22px; }
+.rem-box { display: grid; gap: 10px; padding: 12px; border-radius: 14px; background: color-mix(in srgb, #2bb673 7%, var(--surface)); }
+.rem-card { border: 1.5px solid #9fdcb8; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .rem-tog { color: #7fe0a9; border-color: #1f6a40; } :root:not([data-theme="light"]) .rem-tog[aria-pressed="true"] { background: #12301f; } :root:not([data-theme="light"]) .rem-card { border-color: #1f6a40; } }
+:root[data-theme="dark"] .rem-tog { color: #7fe0a9; border-color: #1f6a40; } :root[data-theme="dark"] .rem-tog[aria-pressed="true"] { background: #12301f; } :root[data-theme="dark"] .rem-card { border-color: #1f6a40; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .chip-btn.wa-btn { background: #12301f; border-color: #1f6a40; color: #7fe0a9; } }
 :root[data-theme="dark"] .chip-btn.wa-btn { background: #12301f; border-color: #1f6a40; color: #7fe0a9; }
 /* Atajos de Movimientos: dos botones grandes, bien visibles. */
@@ -1189,7 +1196,7 @@ function remDue() {
     if (debtLeft(d) <= 0 || !d.due) return; const dd = debtDays(d); const left = money(debtLeft(d), d.cur); const me = d.dir === 'owe_me'; let t = null, mood = 'happy';
     if (dd === 2) t = me ? T(`Pasado mañana ${d.person} te tiene que pagar ${left}. Ve preparando la sonrisa de cobrador.`, `${d.person} owes you ${left} in 2 days.`) : T(`Pasado mañana le debes pagar ${left} a ${d.person}. Ve separándolo.`, `You owe ${d.person} ${left} in 2 days.`);
     else if (dd === 1) t = me ? T(`Mañana ${d.person} te paga ${left}. Si no, ya sabes dónde encontrarlo.`, `${d.person} pays you tomorrow.`) : T(`Mañana toca pagarle ${left} a ${d.person}. Palabra es palabra.`, `Pay ${d.person} tomorrow.`);
-    else if (dd === 0) { mood = 'surprised'; t = me ? T(`Hoy ${d.person} te tiene que pagar ${left}. Si no te escribe, usa "Recordar" en Análisis › Deudas.`, `${d.person} owes you today.`) : T(`¡Hoy le pagas ${left} a ${d.person}! Cuando lo hagas, márcalo en Análisis › Deudas.`, `Pay ${d.person} today.`); }
+    else if (dd === 0) { mood = 'surprised'; t = me ? T(`Hoy ${d.person} te tiene que pagar ${left}. ${d.remind ? 'Te dejé el recordatorio listo en Inicio para mandárselo por WhatsApp.' : 'Si no te escribe, mándale un recordatorio desde Me debes / Te debo.'}`, `${d.person} owes you today.`) : T(`¡Hoy le pagas ${left} a ${d.person}! Cuando lo hagas, márcalo en Análisis › Deudas.`, `Pay ${d.person} today.`); }
     else if (dd < 0 && dd >= -30 && dd % 3 === 0) { mood = me ? 'surprised' : 'angry'; t = me ? T(`${d.person} lleva ${-dd} días atrasado con tus ${left}. Cóbrale con cariño, pero cóbrale.`, `${d.person} is ${-dd} days late.`) : T(`${n}, llevas ${-dd} días atrasado con ${d.person} (${left}). Escríbele y propón una fecha.`, `You're ${-dd} days late with ${d.person}.`); }
     if (t) out.push({ key: 'debt-' + d.id, mood, t, why: me ? T('Lo que no se cobra a tiempo se vuelve incómodo de cobrar.', 'Uncollected debts get awkward.') : T('Pagar a tiempo cuida tu palabra y tus amistades.', 'Paying on time keeps your word.') });
   });
@@ -1370,6 +1377,9 @@ function viewInicio() {
   </section>` : ''}
   ${(() => { const d0 = new Date().getDate(); const lastD = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate(); const ready = S.month === S_month0 ? (d0 <= 5 ? shiftMonth(S_month0, -1) : d0 >= lastD - 2 ? S_month0 : null) : null;
     return ready && list.some(t => monthKey(t.date) === ready) ? `<section class="card" style="background:var(--good-bg)"><div class="label">${T('Balance del mes', 'Monthly balance')}</div><p>${T(`Ya está listo tu balance de ${monthName(ready)}: qué gastaste, qué entró, qué mejorar y dónde ahorrar.`, `Your ${monthName(ready)} balance is ready.`)}</p><button class="primary sm" data-balance="${ready}" style="justify-self:start">${T('Ver balance', 'See balance')}</button></section>` : ''; })()}
+  ${isDemo() ? '' : (S.cfg.debts || []).filter(debtRemDue).map(d => { const dd = debtDays(d); return `<section class="card rem-card"><div class="label">🔔 ${T('Recordatorio de pago', 'Payment reminder')}</div>
+    <p>${dd === 0 ? T(`Hoy ${esc(d.person)} te tiene que pagar <b>${money(debtLeft(d), d.cur)}</b>.`, `${esc(d.person)} owes you ${money(debtLeft(d), d.cur)} today.`) : T(`${esc(d.person)} lleva ${-dd} ${dd === -1 ? 'día' : 'días'} de atraso con tus <b>${money(debtLeft(d), d.cur)}</b>.`, `${esc(d.person)} is ${-dd} days late.`)} ${T('Te dejé el mensaje listo; solo toca Enviar en WhatsApp.', 'The message is ready; just tap Send.')}</p>
+    <div class="tools"><a class="chip-btn wa-btn" href="${esc(waLink(d))}" target="_blank" rel="noopener" data-dwa="${esc(d.id)}">${WA_ICO}${T('Enviar recordatorio', 'Send reminder')}</a><button class="chip-btn" data-dpaid="${esc(d.id)}">${T('Ya me pagó', 'Already paid')}</button></div></section>`; }).join('')}
   ${isDemo() ? '' : fixedCard(S.month)}
   ${isDemo() ? '' : (() => { const D = S.cfg.debts || []; const tot = dir => D.filter(d => d.dir === dir).reduce((a, d) => a + conv(debtLeft(d), d.cur, S.cfg.mainCur), 0); const late = D.filter(d => debtLeft(d) > 0 && debtDays(d) !== null && debtDays(d) <= 2).length;
     return `<section class="card"><div class="label">${T('Me debes / Te debo', 'Owed / I owe')}</div>
@@ -1483,7 +1493,7 @@ function viewTasas() {
 // ---------- Sugerencias (solo versión de prueba) ----------
 // Se envían a un Google Form de Ricardo; él las ve en la hoja de respuestas.
 // Para conectarlo: pega aquí el id del formulario y los entry.N de cada pregunta (salen del enlace prellenado).
-const APP_VER = 'v45';
+const APP_VER = 'v46';
 const SUGG = { form: '', name: '', email: '', text: '', meta: '' };
 const TEST_BUILD = /github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
 const suggReady = () => !!(SUGG.form && SUGG.name && SUGG.email && SUGG.text);
@@ -2335,7 +2345,7 @@ function viewDeudas() {
   <section class="card">${list.length ? list.map(d => { const left = debtLeft(d); const p = d.amount ? 1 - left / d.amount : 0;
     return `<div class="goal"><div class="top"><b>${esc(d.person)}</b><span class="num">${money(left, d.cur)}</span></div>
       <div class="track"><i style="width:${(p * 100).toFixed(1)}%"></i></div>
-      <p class="note">${FINSUB.dir === 'owe_me' ? T('Le prestaste', 'Lent') : T('Te prestó', 'Lent you')} ${money(d.amount, d.cur)} ${T('el', 'on')} ${esc(dfmt(d.date))}${d.due ? ` · ${T('pago prometido:', 'due')} ${esc(dfmt(d.due))}` : ''} · ${debtStatus(d)}${d.note ? `<br>${esc(d.note)}` : ''}</p>
+      <p class="note">${FINSUB.dir === 'owe_me' ? T('Le prestaste', 'Lent') : T('Te prestó', 'Lent you')} ${money(d.amount, d.cur)} ${T('el', 'on')} ${esc(dfmt(d.date))}${d.due ? ` · ${T('pago prometido:', 'due')} ${esc(dfmt(d.due))}` : ''} · ${debtStatus(d)}${d.remind && left > 0 && d.due ? `<br>🔔 ${d.remSent ? T(`Recordatorio enviado el ${dfmt(d.remSent)}`, `Reminder sent ${dfmt(d.remSent)}`) : T(`Recordatorio por WhatsApp el ${dfmt(d.due)}`, `WhatsApp reminder on ${dfmt(d.due)}`)}` : ''}${d.note ? `<br>${esc(d.note)}` : ''}</p>
       ${left > 0 ? `<div class="tools"><button class="chip-btn" data-dpay="${esc(d.id)}">${T('Abono', 'Partial')}</button><button class="chip-btn" data-dfull="${esc(d.id)}">${T('Saldada', 'Settled')}</button>${d.dir === 'owe_me' ? `<a class="chip-btn wa-btn" href="${esc(waLink(d))}" target="_blank" rel="noopener" data-dwa="${esc(d.id)}">${WA_ICO}${T('Recordar por WhatsApp', 'Remind on WhatsApp')}</a>${d.phone ? '' : `<button class="mini-x" data-dphone="${esc(d.id)}">${T('+ Su número', '+ Number')}</button>`}` : ''}<button class="mini-x" data-ddel="${esc(d.id)}">${T('Borrar', 'Delete')}</button></div>` : `<div class="tools"><button class="mini-x" data-ddel="${esc(d.id)}">${T('Borrar', 'Delete')}</button></div>`}</div>`; }).join('')
     : `<p class="note">${FINSUB.dir === 'owe_me' ? T('Nadie te debe nada. ¡Qué paz!', 'Nobody owes you.') : T('No le debes a nadie. ¡Así da gusto!', 'You owe nobody.')}</p>`}</section>
   ${tips.length ? `<section class="card"><div class="label">${T('Mi evaluación', 'My take')}</div><div class="tips">${tips.map(t => `<div class="tip"><p>${t}</p></div>`).join('')}</div></section>` : ''}`;
@@ -2348,6 +2358,10 @@ function viewFin() {
 // WhatsApp: abre el chat con el mensaje ya escrito; la persona solo toca Enviar.
 // Números venezolanos 0414… se convierten a 58414…; sin número, WhatsApp deja elegir el contacto.
 const waNum = v => { let n = String(v || '').replace(/\D/g, ''); if (!n) return ''; if (n.startsWith('00')) n = n.slice(2); if (n.startsWith('0')) n = '58' + n.slice(1); else if (n.length === 10 && /^4/.test(n)) n = '58' + n; return n.length >= 10 ? n : ''; };
+const CONTACTS_OK = !!(navigator.contacts && navigator.contacts.select);
+// Recordatorio programado: aparece en Inicio desde el día prometido mientras la deuda siga sin pagar.
+// Tras enviarlo, si sigue sin pagar vuelve a aparecer cada 3 días.
+const debtRemDue = d => d.dir === 'owe_me' && d.remind && d.due && debtLeft(d) > 0 && debtDays(d) <= 0 && (!d.remSent || (Date.now() - new Date(d.remSent + 'T00:00')) / 864e5 >= 3);
 const waLink = d => `https://wa.me/${waNum(d.phone)}?text=${encodeURIComponent(debtMsg(d))}`;
 const WA_ICO = '<svg class="wa-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.2A9.8 9.8 0 0 0 3.6 17l-1.3 4.8 4.9-1.3A9.8 9.8 0 1 0 12 2.2Zm0 17.9c-1.5 0-2.9-.4-4.2-1.1l-.3-.2-2.9.8.8-2.8-.2-.3A8.1 8.1 0 1 1 12 20.1Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1-.7-.3-1.4-.7-2-1.3-.5-.5-1-1.1-1.3-1.7-.1-.2 0-.4.1-.5l.4-.4.2-.4v-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3c-.3.3-1 1-1 2.3s1 2.7 1.2 2.9c.1.2 2 3.1 4.9 4.3 1.8.8 2.5.8 3.4.7.5-.1 1.5-.6 1.8-1.2.2-.6.2-1.1.1-1.2l-.4-.3Z"/></svg>';
 function debtMsg(d) {
@@ -2359,15 +2373,20 @@ function debtMsg(d) {
   ]);
 }
 function openDebtSheet(mode, d) {
-  const root = $('#sheetRoot'); const F = { dir: FINSUB.dir, person: '', phone: '', amount: '', cur: S.cfg.mainCur, date: todayISO(), due: '', note: '', move: true };
+  const root = $('#sheetRoot'); const F = { dir: FINSUB.dir, person: '', phone: '', remind: false, amount: '', cur: S.cfg.mainCur, date: todayISO(), due: '', note: '', move: true };
   const draw = () => {
     const body = mode === 'new' ? `
       <div class="seg plantabs"><button data-ndir="owe_me" aria-pressed="${F.dir === 'owe_me'}">${T('Yo presté', 'I lent')}</button><button data-ndir="i_owe" aria-pressed="${F.dir === 'i_owe'}">${T('Me prestaron', 'I borrowed')}</button></div>
       <div class="field"><label for="dPerson">${F.dir === 'owe_me' ? T('¿A quién le prestaste?', 'Who did you lend to?') : T('¿Quién te prestó?', 'Who lent you?')}</label><input id="dPerson" maxlength="30" value="${esc(F.person)}"></div>
-      ${F.dir === 'owe_me' ? `<div class="field"><label for="dPhone">${T('Su WhatsApp', 'Their WhatsApp')}</label><input id="dPhone" type="tel" inputmode="tel" maxlength="20" placeholder="${T('Opcional · 0414 1234567', 'Optional')}" value="${esc(F.phone)}"><span class="note">${T('Para mandarle un recordatorio amistoso el día del pago.', 'To send a friendly reminder on payday.')}</span></div>` : ''}
+
       <div class="field"><label for="dAmt">${T('Monto', 'Amount')}</label><div class="amount"><input id="dAmt" inputmode="decimal" placeholder="0" value="${esc(F.amount)}"><span class="curtog"><button data-dcur="USD" aria-pressed="${F.cur === 'USD'}">$</button><button data-dcur="VES" aria-pressed="${F.cur === 'VES'}">Bs</button></span></div></div>
       <div class="two"><div class="field"><label for="dDate">${T('Fecha del préstamo', 'Loan date')}</label><input id="dDate" type="date" value="${esc(F.date)}"></div>
         <div class="field"><label for="dDue">${F.dir === 'owe_me' ? T('Dijo que paga el', 'Promised to pay') : T('Prometí pagar el', 'I promised to pay')}</label><input id="dDue" type="date" value="${esc(F.due)}"></div></div>
+      ${F.dir === 'owe_me' ? `<button type="button" class="rem-tog" id="dRem" aria-pressed="${F.remind}">${WA_ICO}<span>${F.remind ? '✓ ' : ''}${T('Enviar recordatorio a', 'Send a reminder to')} <b id="dRemName">${esc(F.person.trim() || T('esta persona', 'this person'))}</b></span></button>
+      ${F.remind ? `<div class="rem-box">
+        ${CONTACTS_OK ? `<button type="button" class="chip-btn" id="dPick">📇 ${T('Buscar en mis contactos', 'Pick from contacts')}</button>` : ''}
+        <div class="field"><label for="dPhone">${T('Su WhatsApp', 'Their WhatsApp')}</label><input id="dPhone" type="tel" inputmode="tel" maxlength="20" placeholder="0414 1234567" value="${esc(F.phone)}"></div>
+        <p class="note">${T('El día que prometió pagar te aviso en Inicio y con un toque se abre WhatsApp con un mensaje amistoso listo. Si marcas la deuda como pagada antes, no se envía nada.', 'On the due date I will remind you and open WhatsApp with a friendly message. If it gets paid first, nothing is sent.')}</p></div>` : ''}` : ''}
       <div class="field"><label for="dNote">${T('Nota', 'Note')}</label><input id="dNote" maxlength="60" placeholder="${T('Opcional', 'Optional')}" value="${esc(F.note)}"></div>
       <label class="cls"><span>${F.dir === 'owe_me' ? T('Descontarlo de mi dinero disponible', 'Take it from my available money') : T('Sumarlo a mi dinero disponible', 'Add it to my available money')}</span><input type="checkbox" id="dMove" ${F.move ? 'checked' : ''}></label>`
       : `<p>${d.person}: ${T('quedan', 'left')} <b>${money(debtLeft(d), d.cur)}</b></p>
@@ -2377,9 +2396,11 @@ function openDebtSheet(mode, d) {
       ${body}<p class="err" id="dErr" hidden></p><button class="primary" id="dSave">${T('Guardar', 'Save')}</button></div></div>`;
   };
   const read = () => { ['person:dPerson', 'phone:dPhone', 'amount:dAmt', 'date:dDate', 'due:dDue', 'note:dNote'].forEach(x => { const [k, id] = x.split(':'); const el = $('#' + id); if (el) F[k] = el.value; }); const mv = $('#dMove'); if (mv) F.move = mv.checked; };
-  draw(); root.oninput = null;
+  draw(); root.oninput = e => { if (e.target.id === 'dPerson') { const n = $('#dRemName'); if (n) n.textContent = e.target.value.trim() || T('esta persona', 'this person'); } };
   root.onclick = async e => {
     if (e.target.id === 'scrim' || e.target.closest('#closeSheet')) { sheetClose(root); return; }
+    if (e.target.closest('#dRem')) { read(); F.remind = !F.remind; draw(); if (F.remind) { const ph = $('#dPhone'); if (ph && !CONTACTS_OK) ph.focus(); } return; }
+    if (e.target.closest('#dPick')) { read(); try { const [c] = await navigator.contacts.select(['name', 'tel'], { multiple: false }); if (c) { const tel = (c.tel || []).find(Boolean); if (tel) F.phone = tel; if (!F.person.trim() && c.name && c.name[0]) F.person = c.name[0]; draw(); if (!tel) toast(T('Ese contacto no tiene número.', 'That contact has no number.')); } } catch (x) { toast(T('No pude abrir tus contactos. Escribe el número.', 'Could not open contacts.')); } return; }
     const nd = e.target.closest('[data-ndir]'); if (nd) { read(); F.dir = nd.dataset.ndir; draw(); return; }
     const dc = e.target.closest('[data-dcur]'); if (dc) { read(); F.cur = dc.dataset.dcur; draw(); return; }
     if (!e.target.closest('#dSave')) return;
@@ -2387,7 +2408,10 @@ function openDebtSheet(mode, d) {
     if (mode === 'new') {
       read(); const a = parseAmount(F.amount);
       if (!F.person.trim() || !a || a <= 0) { err.textContent = T('Escribe el nombre y el monto.', 'Enter name and amount.'); err.hidden = false; return; }
-      const debt = { id: newId('d'), dir: F.dir, person: F.person.trim(), phone: F.dir === 'owe_me' ? waNum(F.phone) : '', amount: Math.abs(a), cur: F.cur, date: F.date || todayISO(), due: F.due || '', note: F.note.trim(), move: F.move, pays: [] };
+      const rem = F.dir === 'owe_me' && F.remind;
+      if (rem && !F.due) { err.textContent = T('Para el recordatorio, pon la fecha en que prometió pagar.', 'Set the promised date for the reminder.'); err.hidden = false; return; }
+      if (rem && !waNum(F.phone)) { err.textContent = T('Para el recordatorio, busca o escribe su número de WhatsApp.', 'Add their WhatsApp number.'); err.hidden = false; return; }
+      const debt = { id: newId('d'), dir: F.dir, person: F.person.trim(), phone: F.dir === 'owe_me' && F.remind ? waNum(F.phone) : '', remind: F.dir === 'owe_me' && F.remind, amount: Math.abs(a), cur: F.cur, date: F.date || todayISO(), due: F.due || '', note: F.note.trim(), move: F.move, pays: [] };
       S.cfg.debts = (S.cfg.debts || []).concat([debt]); FINSUB.dir = F.dir; sheetClose(root); store.saveCfg();
       if (F.move) { try { await store.put({ id: newId(), type: 'deuda', debtId: debt.id, dir: debt.dir, flow: debt.dir === 'owe_me' ? 'out' : 'in', amount: debt.amount, cur: debt.cur, rates: nowRates(), note: (debt.dir === 'owe_me' ? T('Préstamo a ', 'Loan to ') : T('Préstamo de ', 'Loan from ')) + debt.person, date: debt.date, src: 'deuda', created: Date.now() }); } catch (e2) { saveError(e2); } }
       render(); petDebt(debt, 'new');
@@ -2411,6 +2435,13 @@ function petDebt(d, ev) {
     : vary('d-part', 'happy', [T(`Abono anotado. Quedan ${money(debtLeft(d), d.cur)}.`, `Payment logged. ${money(debtLeft(d), d.cur)} left.`), T(`Poquito a poco se llena el tobo. Faltan ${money(debtLeft(d), d.cur)}.`, `Bit by bit. ${money(debtLeft(d), d.cur)} left.`)]);
   petSay(e); if (!document.getElementById('petPanel')) petPop(e.t, e.mood);
 }
+// Botones del recordatorio (en Inicio y en Me debes): abrir WhatsApp o marcar que ya pagó.
+function debtQuick(e) {
+  const get = id => (S.cfg.debts || []).find(d => d.id === id);
+  const dw = e.target.closest('[data-dwa]'); if (dw) { const d = get(dw.dataset.dwa); if (d && debtRemDue(d)) { d.remSent = todayISO(); S.cfg.debts = S.cfg.debts.slice(); store.saveCfg(); setTimeout(render, 300); } if (d) setTimeout(() => petPop(T(`Te abrí WhatsApp con el mensaje para ${d.person}. Solo toca Enviar.`, `Opened WhatsApp. Just tap Send.`), 'happy'), 400); return true; }
+  const pd = e.target.closest('[data-dpaid]'); if (pd) { const d = get(pd.dataset.dpaid); if (d) debtPay(d, debtLeft(d)); return true; }
+  return false;
+}
 function finClick(e) {
   const fs = e.target.closest('[data-fsub]'); if (fs) { FINSUB.t = fs.dataset.fsub; render(); return true; }
   const dd = e.target.closest('[data-ddir]'); if (dd) { FINSUB.dir = dd.dataset.ddir; render(); return true; }
@@ -2418,8 +2449,7 @@ function finClick(e) {
   const get = id => (S.cfg.debts || []).find(d => d.id === id);
   const dp = e.target.closest('[data-dpay]'); if (dp) { openDebtSheet('pay', get(dp.dataset.dpay)); return true; }
   const df = e.target.closest('[data-dfull]'); if (df) { const d = get(df.dataset.dfull); if (d) debtPay(d, debtLeft(d)); return true; }
-  const dw = e.target.closest('[data-dwa]'); if (dw) { const d = get(dw.dataset.dwa); if (d) setTimeout(() => petPop(T(`Te abrí WhatsApp con el mensaje para ${d.person}. Solo toca Enviar.`, `Opened WhatsApp. Just tap Send.`), 'happy'), 400); return true; }
-  const dph = e.target.closest('[data-dphone]'); if (dph) { const d = get(dph.dataset.dphone); if (!d) return true; const v = prompt(T(`WhatsApp de ${d.person} (ej. 0414 1234567)`, `${d.person}'s WhatsApp`), ''); const n = waNum(v); if (v && !n) { toast(T('Ese número no se ve completo.', 'That number looks incomplete.')); return true; } if (n) { d.phone = n; S.cfg.debts = S.cfg.debts.slice(); render(); store.saveCfg(); toast(T('Número guardado.', 'Number saved.')); } return true; }
+  const dph = e.target.closest('[data-dphone]'); if (dph) { const d = get(dph.dataset.dphone); if (!d) return true; const v = prompt(T(`WhatsApp de ${d.person} (ej. 0414 1234567)`, `${d.person}'s WhatsApp`), ''); const n = waNum(v); if (v && !n) { toast(T('Ese número no se ve completo.', 'That number looks incomplete.')); return true; } if (n) { d.phone = n; if (d.due) d.remind = true; S.cfg.debts = S.cfg.debts.slice(); render(); store.saveCfg(); toast(T('Número guardado.', 'Number saved.')); } return true; }
   const dm = e.target.closest('[data-dmsg]'); if (dm) { const d = get(dm.dataset.dmsg); if (!d) return true; const txt = debtMsg(d);
     const done = () => toast(T('Mensaje copiado. Pégalo en WhatsApp.', 'Message copied.'));
     try { navigator.clipboard.writeText(txt).then(done, () => petPop(txt, 'happy')); } catch (x) { petPop(txt, 'happy'); } return true; }
@@ -2507,6 +2537,7 @@ document.addEventListener('click', async e => {
   const smb = e.target.closest('[data-sms]'); if (smb) { S.cfg.smsBridge = smb.dataset.sms === '1'; store.saveCfg(); render(); return; }
   if (e.target.closest('#smsGo')) { smsCheck(); return; }
   const gdb = e.target.closest('[data-godebt]'); if (gdb) { S.tab = 'deudas'; render(); window.scrollTo(0, 0); if (gdb.dataset.godebt === 'new') openDebtSheet('new'); return; }
+  if (debtQuick(e)) return;
   if ((S.tab === 'fin' || S.tab === 'deudas') && finClick(e)) return;
   if (S.tab === 'plan' && (fixedClick(e) || planClick(e))) return;
   const pay = e.target.closest('[data-pay]'); if (pay) { pay.disabled = true; return payFixed(pay.dataset.pay); }
