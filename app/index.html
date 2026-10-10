@@ -256,6 +256,15 @@ p { margin: 0; }
 .row .v small { display: block; font-weight: 500; font-size: 11px; color: var(--ink-3); }
 .row .v.inc { color: var(--good); }
 .tools { display: flex; gap: 8px; flex-wrap: wrap; }
+/* Atajos de Movimientos: dos botones grandes, bien visibles. */
+.qa { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.qa-btn { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; text-align: left; padding: 14px; border-radius: 18px; border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line)); background: color-mix(in srgb, var(--accent) 7%, var(--surface)); color: var(--ink); box-shadow: 0 2px 10px rgba(20, 30, 60, .06); min-height: 112px; }
+.qa-btn:active { transform: scale(.98); }
+.qa-ico { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); }
+.qa-ico svg { width: 22px; height: 22px; }
+.qa-t { display: flex; flex-direction: column; gap: 3px; }
+.qa-t b { font-family: var(--f-display); font-size: 15.5px; line-height: 1.15; }
+.qa-t small { font-size: 12.5px; color: var(--ink-3); line-height: 1.25; }
 .chip-btn { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 8px 14px; font-size: 14px; font-weight: 600; }
 .empty { text-align: center; color: var(--ink-3); padding: 28px 12px; }
 
@@ -1355,7 +1364,12 @@ function viewInicio() {
 
 function viewMovs() {
   const list = data().filter(t => monthKey(t.date) === S.month).sort((a, b) => b.date.localeCompare(a.date) || (b.created || 0) - (a.created || 0));
-  const tools = `<div class="tools"><button class="chip-btn" data-go="pagomovil">${T('Subir Pago Móvil', 'Upload Pago Móvil')}</button><button class="chip-btn" data-go="importar">${T('Importar estado de cuenta', 'Import bank statement')}</button>${dl && S.tx.length ? `<button class="chip-btn" id="exportBtn">${T('Exportar CSV', 'Export CSV')}</button>` : ''}</div>`;
+  // Atajos grandes para cargar movimientos sin escribirlos uno por uno.
+  const ico = d => `<span class="qa-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}</svg></span>`;
+  const tools = `<div class="qa">
+    <button class="qa-btn" data-go="pagomovil">${ico('<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M12 15V8.5M9 11l3-3 3 3"/><path d="M10.5 18.5h3"/>')}<span class="qa-t"><b>${T('Subir Pago Móvil', 'Upload Pago Móvil')}</b><small>${T('Pega el mensaje o la captura', 'Paste the message or screenshot')}</small></span></button>
+    <button class="qa-btn" data-go="importar">${ico('<path d="M3 10l9-6 9 6"/><path d="M5 10v8M9.5 10v8M14.5 10v8M19 10v8"/><path d="M3 20.5h18"/>')}<span class="qa-t"><b>${T('Importar del banco', 'Import from bank')}</b><small>${T('Tu estado de cuenta completo', 'Your full statement')}</small></span></button>
+  </div>${dl && S.tx.length ? `<div class="tools"><button class="chip-btn" id="exportBtn">${T('Exportar CSV', 'Export CSV')}</button></div>` : ''}`;
   if (!list.length) return petPanel(true) + tools + `<div class="card empty">${T('No hay movimientos en', 'No entries in')} ${esc(monthName(S.month))}.</div>`;
   const days = {}; list.forEach(t => (days[t.date] = days[t.date] || []).push(t));
   return petPanel(true) + tools + `<div class="list">${Object.entries(days).map(([d, ts]) => {
@@ -1452,7 +1466,7 @@ function viewTasas() {
 // ---------- Sugerencias (solo versión de prueba) ----------
 // Se envían a un Google Form de Ricardo; él las ve en la hoja de respuestas.
 // Para conectarlo: pega aquí el id del formulario y los entry.N de cada pregunta (salen del enlace prellenado).
-const APP_VER = 'v42';
+const APP_VER = 'v43';
 const SUGG = { form: '', name: '', email: '', text: '', meta: '' };
 const TEST_BUILD = /github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
 const suggReady = () => !!(SUGG.form && SUGG.name && SUGG.email && SUGG.text);
