@@ -256,6 +256,10 @@ p { margin: 0; }
 .row .v small { display: block; font-weight: 500; font-size: 11px; color: var(--ink-3); }
 .row .v.inc { color: var(--good); }
 .tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip-btn.wa-btn { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; background: #e7f8ee; border-color: #9fdcb8; color: #0d6b3a; }
+.wa-ico { width: 17px; height: 17px; flex: none; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .chip-btn.wa-btn { background: #12301f; border-color: #1f6a40; color: #7fe0a9; } }
+:root[data-theme="dark"] .chip-btn.wa-btn { background: #12301f; border-color: #1f6a40; color: #7fe0a9; }
 /* Atajos de Movimientos: dos botones grandes, bien visibles. */
 .qa { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .qa-btn { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; text-align: left; padding: 14px; border-radius: 18px; border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line)); background: color-mix(in srgb, var(--accent) 7%, var(--surface)); color: var(--ink); box-shadow: 0 2px 10px rgba(20, 30, 60, .06); min-height: 112px; }
@@ -1479,7 +1483,7 @@ function viewTasas() {
 // ---------- Sugerencias (solo versión de prueba) ----------
 // Se envían a un Google Form de Ricardo; él las ve en la hoja de respuestas.
 // Para conectarlo: pega aquí el id del formulario y los entry.N de cada pregunta (salen del enlace prellenado).
-const APP_VER = 'v44';
+const APP_VER = 'v45';
 const SUGG = { form: '', name: '', email: '', text: '', meta: '' };
 const TEST_BUILD = /github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
 const suggReady = () => !!(SUGG.form && SUGG.name && SUGG.email && SUGG.text);
@@ -2332,7 +2336,7 @@ function viewDeudas() {
     return `<div class="goal"><div class="top"><b>${esc(d.person)}</b><span class="num">${money(left, d.cur)}</span></div>
       <div class="track"><i style="width:${(p * 100).toFixed(1)}%"></i></div>
       <p class="note">${FINSUB.dir === 'owe_me' ? T('Le prestaste', 'Lent') : T('Te prestó', 'Lent you')} ${money(d.amount, d.cur)} ${T('el', 'on')} ${esc(dfmt(d.date))}${d.due ? ` · ${T('pago prometido:', 'due')} ${esc(dfmt(d.due))}` : ''} · ${debtStatus(d)}${d.note ? `<br>${esc(d.note)}` : ''}</p>
-      ${left > 0 ? `<div class="tools"><button class="chip-btn" data-dpay="${esc(d.id)}">${T('Abono', 'Partial')}</button><button class="chip-btn" data-dfull="${esc(d.id)}">${T('Saldada', 'Settled')}</button>${d.dir === 'owe_me' ? `<button class="chip-btn" data-dmsg="${esc(d.id)}">${T('Recordar', 'Remind')}</button>` : ''}<button class="mini-x" data-ddel="${esc(d.id)}">${T('Borrar', 'Delete')}</button></div>` : `<div class="tools"><button class="mini-x" data-ddel="${esc(d.id)}">${T('Borrar', 'Delete')}</button></div>`}</div>`; }).join('')
+      ${left > 0 ? `<div class="tools"><button class="chip-btn" data-dpay="${esc(d.id)}">${T('Abono', 'Partial')}</button><button class="chip-btn" data-dfull="${esc(d.id)}">${T('Saldada', 'Settled')}</button>${d.dir === 'owe_me' ? `<a class="chip-btn wa-btn" href="${esc(waLink(d))}" target="_blank" rel="noopener" data-dwa="${esc(d.id)}">${WA_ICO}${T('Recordar por WhatsApp', 'Remind on WhatsApp')}</a>${d.phone ? '' : `<button class="mini-x" data-dphone="${esc(d.id)}">${T('+ Su número', '+ Number')}</button>`}` : ''}<button class="mini-x" data-ddel="${esc(d.id)}">${T('Borrar', 'Delete')}</button></div>` : `<div class="tools"><button class="mini-x" data-ddel="${esc(d.id)}">${T('Borrar', 'Delete')}</button></div>`}</div>`; }).join('')
     : `<p class="note">${FINSUB.dir === 'owe_me' ? T('Nadie te debe nada. ¡Qué paz!', 'Nobody owes you.') : T('No le debes a nadie. ¡Así da gusto!', 'You owe nobody.')}</p>`}</section>
   ${tips.length ? `<section class="card"><div class="label">${T('Mi evaluación', 'My take')}</div><div class="tips">${tips.map(t => `<div class="tip"><p>${t}</p></div>`).join('')}</div></section>` : ''}`;
 }
@@ -2341,6 +2345,11 @@ function viewFin() {
   return `<div class="seg plantabs">${tabs.map(([k, l]) => `<button data-fsub="${k}" aria-pressed="${FINSUB.t === k}">${l}</button>`).join('')}</div>`
     + (FINSUB.t === 'proy' ? viewProy() : viewAnalisis());
 }
+// WhatsApp: abre el chat con el mensaje ya escrito; la persona solo toca Enviar.
+// Números venezolanos 0414… se convierten a 58414…; sin número, WhatsApp deja elegir el contacto.
+const waNum = v => { let n = String(v || '').replace(/\D/g, ''); if (!n) return ''; if (n.startsWith('00')) n = n.slice(2); if (n.startsWith('0')) n = '58' + n.slice(1); else if (n.length === 10 && /^4/.test(n)) n = '58' + n; return n.length >= 10 ? n : ''; };
+const waLink = d => `https://wa.me/${waNum(d.phone)}?text=${encodeURIComponent(debtMsg(d))}`;
+const WA_ICO = '<svg class="wa-ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2.2A9.8 9.8 0 0 0 3.6 17l-1.3 4.8 4.9-1.3A9.8 9.8 0 1 0 12 2.2Zm0 17.9c-1.5 0-2.9-.4-4.2-1.1l-.3-.2-2.9.8.8-2.8-.2-.3A8.1 8.1 0 1 1 12 20.1Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1-.7-.3-1.4-.7-2-1.3-.5-.5-1-1.1-1.3-1.7-.1-.2 0-.4.1-.5l.4-.4.2-.4v-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3c-.3.3-1 1-1 2.3s1 2.7 1.2 2.9c.1.2 2 3.1 4.9 4.3 1.8.8 2.5.8 3.4.7.5-.1 1.5-.6 1.8-1.2.2-.6.2-1.1.1-1.2l-.4-.3Z"/></svg>';
 function debtMsg(d) {
   const n = uname(); const left = money(debtLeft(d), d.cur);
   return rnd([
@@ -2350,11 +2359,12 @@ function debtMsg(d) {
   ]);
 }
 function openDebtSheet(mode, d) {
-  const root = $('#sheetRoot'); const F = { dir: FINSUB.dir, person: '', amount: '', cur: S.cfg.mainCur, date: todayISO(), due: '', note: '', move: true };
+  const root = $('#sheetRoot'); const F = { dir: FINSUB.dir, person: '', phone: '', amount: '', cur: S.cfg.mainCur, date: todayISO(), due: '', note: '', move: true };
   const draw = () => {
     const body = mode === 'new' ? `
       <div class="seg plantabs"><button data-ndir="owe_me" aria-pressed="${F.dir === 'owe_me'}">${T('Yo presté', 'I lent')}</button><button data-ndir="i_owe" aria-pressed="${F.dir === 'i_owe'}">${T('Me prestaron', 'I borrowed')}</button></div>
       <div class="field"><label for="dPerson">${F.dir === 'owe_me' ? T('¿A quién le prestaste?', 'Who did you lend to?') : T('¿Quién te prestó?', 'Who lent you?')}</label><input id="dPerson" maxlength="30" value="${esc(F.person)}"></div>
+      ${F.dir === 'owe_me' ? `<div class="field"><label for="dPhone">${T('Su WhatsApp', 'Their WhatsApp')}</label><input id="dPhone" type="tel" inputmode="tel" maxlength="20" placeholder="${T('Opcional · 0414 1234567', 'Optional')}" value="${esc(F.phone)}"><span class="note">${T('Para mandarle un recordatorio amistoso el día del pago.', 'To send a friendly reminder on payday.')}</span></div>` : ''}
       <div class="field"><label for="dAmt">${T('Monto', 'Amount')}</label><div class="amount"><input id="dAmt" inputmode="decimal" placeholder="0" value="${esc(F.amount)}"><span class="curtog"><button data-dcur="USD" aria-pressed="${F.cur === 'USD'}">$</button><button data-dcur="VES" aria-pressed="${F.cur === 'VES'}">Bs</button></span></div></div>
       <div class="two"><div class="field"><label for="dDate">${T('Fecha del préstamo', 'Loan date')}</label><input id="dDate" type="date" value="${esc(F.date)}"></div>
         <div class="field"><label for="dDue">${F.dir === 'owe_me' ? T('Dijo que paga el', 'Promised to pay') : T('Prometí pagar el', 'I promised to pay')}</label><input id="dDue" type="date" value="${esc(F.due)}"></div></div>
@@ -2366,7 +2376,7 @@ function openDebtSheet(mode, d) {
       <div class="sheet-head"><h2>${mode === 'new' ? T('Anotar préstamo', 'Log a loan') : T('Registrar abono', 'Log a payment')}</h2><button class="x" id="closeSheet" aria-label="${T('Cerrar', 'Close')}">×</button></div>
       ${body}<p class="err" id="dErr" hidden></p><button class="primary" id="dSave">${T('Guardar', 'Save')}</button></div></div>`;
   };
-  const read = () => { ['person:dPerson', 'amount:dAmt', 'date:dDate', 'due:dDue', 'note:dNote'].forEach(x => { const [k, id] = x.split(':'); const el = $('#' + id); if (el) F[k] = el.value; }); const mv = $('#dMove'); if (mv) F.move = mv.checked; };
+  const read = () => { ['person:dPerson', 'phone:dPhone', 'amount:dAmt', 'date:dDate', 'due:dDue', 'note:dNote'].forEach(x => { const [k, id] = x.split(':'); const el = $('#' + id); if (el) F[k] = el.value; }); const mv = $('#dMove'); if (mv) F.move = mv.checked; };
   draw(); root.oninput = null;
   root.onclick = async e => {
     if (e.target.id === 'scrim' || e.target.closest('#closeSheet')) { sheetClose(root); return; }
@@ -2377,7 +2387,7 @@ function openDebtSheet(mode, d) {
     if (mode === 'new') {
       read(); const a = parseAmount(F.amount);
       if (!F.person.trim() || !a || a <= 0) { err.textContent = T('Escribe el nombre y el monto.', 'Enter name and amount.'); err.hidden = false; return; }
-      const debt = { id: newId('d'), dir: F.dir, person: F.person.trim(), amount: Math.abs(a), cur: F.cur, date: F.date || todayISO(), due: F.due || '', note: F.note.trim(), move: F.move, pays: [] };
+      const debt = { id: newId('d'), dir: F.dir, person: F.person.trim(), phone: F.dir === 'owe_me' ? waNum(F.phone) : '', amount: Math.abs(a), cur: F.cur, date: F.date || todayISO(), due: F.due || '', note: F.note.trim(), move: F.move, pays: [] };
       S.cfg.debts = (S.cfg.debts || []).concat([debt]); FINSUB.dir = F.dir; sheetClose(root); store.saveCfg();
       if (F.move) { try { await store.put({ id: newId(), type: 'deuda', debtId: debt.id, dir: debt.dir, flow: debt.dir === 'owe_me' ? 'out' : 'in', amount: debt.amount, cur: debt.cur, rates: nowRates(), note: (debt.dir === 'owe_me' ? T('Préstamo a ', 'Loan to ') : T('Préstamo de ', 'Loan from ')) + debt.person, date: debt.date, src: 'deuda', created: Date.now() }); } catch (e2) { saveError(e2); } }
       render(); petDebt(debt, 'new');
@@ -2408,6 +2418,8 @@ function finClick(e) {
   const get = id => (S.cfg.debts || []).find(d => d.id === id);
   const dp = e.target.closest('[data-dpay]'); if (dp) { openDebtSheet('pay', get(dp.dataset.dpay)); return true; }
   const df = e.target.closest('[data-dfull]'); if (df) { const d = get(df.dataset.dfull); if (d) debtPay(d, debtLeft(d)); return true; }
+  const dw = e.target.closest('[data-dwa]'); if (dw) { const d = get(dw.dataset.dwa); if (d) setTimeout(() => petPop(T(`Te abrí WhatsApp con el mensaje para ${d.person}. Solo toca Enviar.`, `Opened WhatsApp. Just tap Send.`), 'happy'), 400); return true; }
+  const dph = e.target.closest('[data-dphone]'); if (dph) { const d = get(dph.dataset.dphone); if (!d) return true; const v = prompt(T(`WhatsApp de ${d.person} (ej. 0414 1234567)`, `${d.person}'s WhatsApp`), ''); const n = waNum(v); if (v && !n) { toast(T('Ese número no se ve completo.', 'That number looks incomplete.')); return true; } if (n) { d.phone = n; S.cfg.debts = S.cfg.debts.slice(); render(); store.saveCfg(); toast(T('Número guardado.', 'Number saved.')); } return true; }
   const dm = e.target.closest('[data-dmsg]'); if (dm) { const d = get(dm.dataset.dmsg); if (!d) return true; const txt = debtMsg(d);
     const done = () => toast(T('Mensaje copiado. Pégalo en WhatsApp.', 'Message copied.'));
     try { navigator.clipboard.writeText(txt).then(done, () => petPop(txt, 'happy')); } catch (x) { petPop(txt, 'happy'); } return true; }
