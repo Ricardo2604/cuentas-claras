@@ -256,6 +256,9 @@ p { margin: 0; }
 .row .v small { display: block; font-weight: 500; font-size: 11px; color: var(--ink-3); }
 .row .v.inc { color: var(--good); }
 .tools { display: flex; gap: 8px; flex-wrap: wrap; }
+.danger-btn { border: 0; border-radius: 14px; padding: 13px 16px; font-size: 15px; font-weight: 700; background: var(--bad); color: #fff; }
+.danger-btn:disabled { opacity: .6; }
+.danger-zone { border: 1px solid color-mix(in srgb, var(--bad) 35%, var(--line)); }
 .chip-btn.wa-btn { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; background: #e7f8ee; border-color: #9fdcb8; color: #0d6b3a; }
 .wa-ico { width: 17px; height: 17px; flex: none; }
 .rem-tog { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 12px 14px; border-radius: 14px; border: 1.5px dashed #9fdcb8; background: transparent; color: #0d6b3a; font-size: 15px; font-weight: 600; }
@@ -1493,7 +1496,7 @@ function viewTasas() {
 // ---------- Sugerencias (solo versión de prueba) ----------
 // Se envían a un Google Form de Ricardo; él las ve en la hoja de respuestas.
 // El formulario tiene dos preguntas (texto y correo): el nombre, la sección y los datos del teléfono van dentro del texto.
-const APP_VER = 'v50';
+const APP_VER = 'v51';
 const SUGG = { form: '1FAIpQLSfxqyUrQ0qfjVElWd7wGnsOfXySq25WfGKISIhriCG8Qs0UQw', email: 'entry.1866519940', text: 'entry.853634718' };
 const TEST_BUILD = /github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
 const suggReady = () => !!(SUGG.form && SUGG.email && SUGG.text);
@@ -1510,6 +1513,32 @@ async function suggFlush() {
 }
 window.addEventListener('online', () => { suggFlush(); });
 setTimeout(() => { suggFlush(); }, 5000);
+// Reinicio total: pide confirmación en una ventana y luego borra todo (cuenta o teléfono) y recarga.
+function openResetSheet() {
+  const root = $('#sheetRoot');
+  root.innerHTML = `<div class="scrim" id="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="rsTitle"><div class="grab"></div>
+    <div class="sheet-head"><h2 id="rsTitle">${T('¿Seguro que quieres empezar de cero?', 'Start over?')}</h2><button class="x" id="closeSheet" aria-label="${T('Cerrar', 'Close')}">×</button></div>
+    <p>${T(`Se borran <b>${S.tx.length} ${S.tx.length === 1 ? 'movimiento' : 'movimientos'}</b>, tus préstamos, metas, gastos fijos, recordatorios, ajustes y el bloqueo con huella. <b>No se puede deshacer.</b>`, `This deletes ${S.tx.length} entries and all settings. It cannot be undone.`)}</p>
+    <p class="err" id="rsErr" hidden></p>
+    <button class="danger-btn" id="rsGo">${T('Sí, borrar todo y empezar de nuevo', 'Yes, delete everything')}</button>
+    <button class="chip-btn" id="rsNo" style="justify-self:center">${T('No, mejor no', 'Cancel')}</button></div></div>`;
+  root.onclick = async e => {
+    if (e.target.id === 'scrim' || e.target.closest('#closeSheet') || e.target.closest('#rsNo')) { sheetClose(root); return; }
+    const go = e.target.closest('#rsGo'); if (!go) return;
+    go.disabled = true; go.textContent = T('Borrando…', 'Deleting…');
+    try {
+      if (store.mode === 'db') {
+        for (const t of S.tx.slice()) await withRetry(() => store.col.doc(t.id).delete());
+        await withRetry(() => store.cfgDoc.delete ? store.cfgDoc.delete() : store.cfgDoc.set({}));
+      }
+      // En el teléfono: todo lo de la app, menos el aviso de instalación.
+      Object.keys(localStorage).filter(k => k.startsWith('cc.') && !['cc.instDone', 'cc.instNo'].includes(k)).forEach(k => localStorage.removeItem(k));
+      try { sessionStorage.clear(); } catch (x) {}
+      location.reload();
+    } catch (err) { const m = $('#rsErr'); m.textContent = T('No pude borrar todo. Revisa tu conexión e intenta otra vez.', 'Could not delete everything. Try again.'); m.hidden = false; go.disabled = false; go.textContent = T('Sí, borrar todo y empezar de nuevo', 'Yes, delete everything'); }
+  };
+  root.onkeydown = e => { if (e.key === 'Escape') sheetClose(root); };
+}
 function viewAjustes() {
   const c = S.cfg; const op = c.opening || { amount: '', cur: c.mainCur };
   const seg = (key, opts) => `<span class="seg">${opts.map(([v, l]) => `<button data-cfg="${key}:${v}" aria-pressed="${c[key] === v}">${l}</button>`).join('')}</span>`;
@@ -1598,6 +1627,10 @@ function viewAjustes() {
     <div class="classes">${allCats().map(ct => `<div class="cls"><span class="name"><i class="dot" style="background:${catColor(ct.id)}"></i>${esc(catName(ct))}${ct.name ? ` <button class="mini-x" data-delcat="${esc(ct.id)}">${T('Quitar', 'Remove')}</button>` : ''}</span>
       <span class="seg"><button data-ess="${esc(ct.id)}:1" aria-pressed="${isEss(ct.id)}">${T('Esencial', 'Essential')}</button><button data-ess="${esc(ct.id)}:0" aria-pressed="${!isEss(ct.id)}">${T('Gusto', 'Treat')}</button></span></div>`).join('')}</div>
     <div class="field"><label for="newCat">${T('Nueva categoría', 'New category')}</label><div class="inline"><input id="newCat" maxlength="24" placeholder="${T('Ej. Transporte, Salud, Mascotas', 'e.g. Transport, Health, Pets')}"><button class="primary sm" id="addCat">${T('Agregar', 'Add')}</button></div></div>
+  </section>
+  <section class="card danger-zone"><div class="label">${T('Empezar de cero', 'Start over')}</div>
+    <p class="note">${T('Borra todos tus movimientos, préstamos, metas, ajustes y el bloqueo, y vuelve a la bienvenida para configurar la app desde el principio.', 'Deletes all your entries, loans, goals, settings and lock, and restarts the setup.')}</p>
+    <button class="danger-btn" id="resetAll">${T('Reiniciar la app', 'Reset the app')}</button>
   </section>`;
 }
 
@@ -2556,6 +2589,7 @@ document.addEventListener('click', async e => {
   const pt = e.target.closest('[data-pet]');
   if (pt) { const k = pt.dataset.pet; if (LOCK.on) { LOCK.pet = k; lockSave(); } appIcon(k); const was = S.cfg.mascot.kind; S.cfg.mascot = { kind: k, name: (was !== k && PETS[k]) ? PETS[k].name : S.cfg.mascot.name }; render(); store.saveCfg(); return; }
   if (e.target.closest('#userSave')) { const n = $('#userName').value.trim(); if (n) { S.cfg.user = { ...(S.cfg.user || {}), name: n }; render(); store.saveCfg(); toast(T(`Listo, ${n}`, `Done, ${n}`)); } return; }
+  if (e.target.closest('#resetAll')) { openResetSheet(); return; }
   if (e.target.closest('#gearBtn')) { S.tab = 'ajustes'; render(); window.scrollTo(0, 0); petEvent('tab'); return; }
   if (e.target.closest('#sgSend')) {
     const name = $('#sgName').value.trim(), email = $('#sgMail').value.trim().toLowerCase(), text = $('#sgText').value.trim();
@@ -2679,6 +2713,24 @@ if (TEST_BUILD) {
   window.addEventListener('appinstalled', () => { instClose(); lsSet('cc.instDone', true); toast(T('¡Listo! Cuentas Claras ya está en tu pantalla de inicio.', 'Installed!')); });
   setTimeout(instMaybe, 1500);
 }
+// Botón Atrás del teléfono (app instalada): primero cierra ventanas y regresa de sección;
+// en Inicio pide tocar Atrás otra vez para salir, así no se cierra por accidente.
+const BACK = { last: 0 };
+const BACK_PARENT = { pagomovil: 'movs', importar: 'movs', balance: 'inicio', consejos: 'fin', ajustes: 'inicio' };
+function backInit() {
+  try { history.replaceState({ cc: 'root' }, ''); history.pushState({ cc: 'app' }, ''); } catch (e) { return; }
+  window.addEventListener('popstate', () => {
+    const keep = () => { try { history.pushState({ cc: 'app' }, ''); } catch (e) {} };
+    if (document.body.classList.contains('locked')) { if (Date.now() - BACK.last < 2000) return history.back(); BACK.last = Date.now(); toast(T('Toca Atrás otra vez para salir', 'Press Back again to exit')); return keep(); }
+    const sr = $('#sheetRoot'); if (sr && sr.firstElementChild) { sheetClose(sr); return keep(); }
+    const ir = document.getElementById('instRoot'); if (ir) { instClose(); return keep(); }
+    if (ONB.shown && ONB.step > 0) { ONB.step--; onbDraw(); return keep(); }
+    if (!ONB.shown && S.tab !== 'inicio') { S.tab = BACK_PARENT[S.tab] || 'inicio'; render(); window.scrollTo(0, 0); return keep(); }
+    if (Date.now() - BACK.last < 2000) { history.back(); return; } // segundo toque: sale de la app
+    BACK.last = Date.now(); toast(T('Toca Atrás otra vez para salir', 'Press Back again to exit')); keep();
+  });
+}
+if (TEST_BUILD) backInit();
 function instMaybe() {
   if (standalone() || lsGet('cc.instDone', false)) return;
   const no = lsGet('cc.instNo', 0); if (no && Date.now() - no < 3 * 864e5) return;
