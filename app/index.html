@@ -226,7 +226,7 @@ p { margin: 0; }
 .replies button:active { transform: translate(1px, 1px); }
 .pet-panel.compact .pet-row { grid-template-columns: 56px 1fr; }
 .pet-panel.compact .pet-btn, .pet-panel.compact .pet-btn svg { width: 66px; height: 66px; }
-.pet-pop { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(92px + env(safe-area-inset-bottom, 0px)); width: calc(100% - 32px); max-width: 488px; z-index: 20; background: var(--surface); box-shadow: var(--shadow); border-radius: 18px; padding: 12px; }
+.pet-pop { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(92px + env(safe-area-inset-bottom, 0px)); width: calc(100% - 32px); max-width: 488px; z-index: 20; background: var(--surface); box-shadow: var(--shadow); border-radius: 18px; padding: 12px; animation: popIn .38s cubic-bezier(.22, 1, .36, 1) both; }
 .pet-pop .pet-row { grid-template-columns: 56px 1fr; }
 .pet-pop .pet-btn, .pet-pop .pet-btn svg { width: 66px; height: 66px; }
 .pet-pop .say { max-width: 100%; }
@@ -294,9 +294,21 @@ nav.tabs .fab { width: 54px; height: 54px; border-radius: 50%; border: 0; backgr
 nav.tabs .fab svg { width: 26px; height: 26px; }
 
 .scrim { position: fixed; inset: 0; background: rgba(10, 14, 24, .45); z-index: 10; display: flex; align-items: flex-end; justify-content: center; }
-.sheet { background: var(--surface); width: 100%; max-width: 520px; max-height: 92%; overflow-y: auto; border-radius: 20px 20px 0 0; padding: 8px 16px calc(20px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 14px; animation: up .22s ease-out; }
+.sheet { background: var(--surface); width: 100%; max-width: 520px; max-height: 92%; overflow-y: auto; border-radius: 20px 20px 0 0; padding: 8px 16px calc(20px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 14px; animation: sheetUp .42s cubic-bezier(.22, 1, .36, 1) both; }
 @keyframes up { from { transform: translateY(30px); opacity: .6; } to { transform: none; opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .sheet { animation: none; } }
+/* Ventanas emergentes: el fondo se oscurece poco a poco y la ventana sube suave; al cerrar, baja y se desvanece. */
+.scrim { animation: fadeIn .28s ease-out both; }
+@keyframes fadeIn { from { opacity: 0; } }
+@keyframes fadeOut { to { opacity: 0; } }
+@keyframes sheetUp { from { transform: translateY(100%); } }
+@keyframes sheetDown { to { transform: translateY(100%); } }
+@keyframes popIn { from { opacity: 0; transform: translate(-50%, 14px) scale(.97); } }
+#sheetRoot.still .scrim, #sheetRoot.still .sheet { animation: none; }
+#sheetRoot.closing, #instRoot.closing { pointer-events: none; }
+#sheetRoot.closing .scrim, #instRoot.closing .sheet-bg { animation: fadeOut .26s ease-in both; }
+#sheetRoot.closing .sheet, #instRoot.closing .sheet.inst { animation: sheetDown .26s cubic-bezier(.4, 0, 1, 1) both; }
+.pet-pop.out, .toast.out { animation: fadeOut .25s ease-in both; }
+@media (prefers-reduced-motion: reduce) { .sheet, .scrim, .pet-pop, .toast, #instRoot .sheet-bg, #instRoot .sheet.inst { animation: none !important; } }
 .grab { width: 40px; height: 4px; border-radius: 2px; background: var(--line); justify-self: center; }
 .sheet-head { display: flex; justify-content: space-between; align-items: center; }
 .x { border: 0; background: var(--surface-2); width: 34px; height: 34px; border-radius: 999px; font-size: 18px; }
@@ -343,7 +355,7 @@ details.how summary { font-weight: 700; cursor: pointer; }
 .pets button { border: 1px solid var(--line); background: var(--surface); border-radius: 12px; padding: 8px 4px; display: grid; justify-items: center; gap: 4px; font-size: 12px; font-weight: 600; }
 .pets button svg { width: 52px; height: 52px; }
 .pets button[aria-pressed="true"] { border-color: var(--accent); background: var(--surface-2); }
-.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(96px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 14px; font-weight: 600; z-index: 30; box-shadow: var(--shadow); max-width: calc(100% - 32px); }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(96px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 14px; font-weight: 600; z-index: 30; box-shadow: var(--shadow); max-width: calc(100% - 32px); animation: popIn .32s cubic-bezier(.22, 1, .36, 1) both; }
 body.locked .app, body.locked nav.tabs, body.locked #sheetRoot, body.locked #onbRoot, body.locked #popRoot { visibility: hidden; }
 #lockRoot { position: fixed; inset: 0; z-index: 100; background: var(--bg); display: grid; place-items: center; padding: 24px 16px; }
 .lock { display: grid; gap: 12px; justify-items: center; text-align: center; width: min(340px, 100%); }
@@ -368,8 +380,8 @@ body.locked .app, body.locked nav.tabs, body.locked #sheetRoot, body.locked #onb
 .lock input { font: inherit; font-size: 22px; text-align: center; letter-spacing: .3em; padding: 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); width: 100%; }
 .lock .primary { width: 100%; }
 .lock .linkbtn { justify-self: center; }
-#instRoot .sheet-bg { position: fixed; inset: 0; background: rgba(10, 14, 24, .45); z-index: 60; }
-#instRoot .sheet.inst { position: fixed; left: 0; right: 0; bottom: 0; z-index: 61; background: var(--surface); border-radius: 22px 22px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 12px; max-width: 560px; margin: 0 auto; box-shadow: var(--shadow); animation: up .3s ease-out; }
+#instRoot .sheet-bg { position: fixed; inset: 0; background: rgba(10, 14, 24, .45); z-index: 60; animation: fadeIn .28s ease-out both; }
+#instRoot .sheet.inst { position: fixed; left: 0; right: 0; bottom: 0; z-index: 61; background: var(--surface); border-radius: 22px 22px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 12px; max-width: 560px; margin: 0 auto; box-shadow: var(--shadow); animation: sheetUp .45s cubic-bezier(.22, 1, .36, 1) both; }
 .inst-top { display: flex; gap: 12px; align-items: center; }
 .inst-top h2 { margin: 0 0 4px; }
 .inst-pet svg { width: 76px; height: 76px; display: block; }
@@ -701,7 +713,8 @@ const $ = s => document.querySelector(s);
 let toastT;
 function toast(msg) {
   let el = $('.toast'); if (!el) { el = document.createElement('div'); el.className = 'toast'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
-  el.textContent = msg; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 2600);
+  el.textContent = msg; el.classList.remove('out'); if (el.hidden) { el.hidden = false; el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; } clearTimeout(toastT);
+  toastT = setTimeout(() => { el.classList.add('out'); toastT = setTimeout(() => { el.hidden = true; el.classList.remove('out'); }, 250); }, 2600);
 }
 const initials = name => String(name).split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
 
@@ -1138,7 +1151,7 @@ function petPop(text, mood) {
   if (!petOn()) return toast(text);
   const r = $('#popRoot');
   r.innerHTML = `<div class="pet-pop" role="status"><div class="pet-row"><span class="pet-btn">${petSVG(S.cfg.mascot.kind, mood)}</span><div class="say pet now"><b>${esc(petName())}</b><p>${esc(text)}</p></div></div></div>`;
-  clearTimeout(popT); popT = setTimeout(() => { r.innerHTML = ''; }, 4500);
+  clearTimeout(popT); popT = setTimeout(() => { const pp = r.querySelector('.pet-pop'); if (pp) pp.classList.add('out'); popT = setTimeout(() => { r.innerHTML = ''; }, 250); }, 4500);
 }
 
 // ---------- Recordatorios con humor ----------
@@ -1466,7 +1479,7 @@ function viewTasas() {
 // ---------- Sugerencias (solo versión de prueba) ----------
 // Se envían a un Google Form de Ricardo; él las ve en la hoja de respuestas.
 // Para conectarlo: pega aquí el id del formulario y los entry.N de cada pregunta (salen del enlace prellenado).
-const APP_VER = 'v43';
+const APP_VER = 'v44';
 const SUGG = { form: '', name: '', email: '', text: '', meta: '' };
 const TEST_BUILD = /github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
 const suggReady = () => !!(SUGG.form && SUGG.name && SUGG.email && SUGG.text);
@@ -1719,6 +1732,21 @@ async function doImport() {
 }
 
 // ---------- Hoja para agregar / editar ----------
+// Cierra la ventana emergente con animación (baja y se desvanece) y luego la vacía.
+function sheetClose(root) {
+  root = root || $('#sheetRoot'); if (!root.firstElementChild || root.classList.contains('closing')) return;
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) { root.innerHTML = ''; return; }
+  root.classList.add('closing'); setTimeout(() => { if (root.classList.contains('closing')) root.innerHTML = ''; }, 260);
+}
+// Solo anima al abrir: si la ventana ya estaba abierta y se redibuja, no vuelve a subir.
+(() => {
+  const root = document.getElementById('sheetRoot'); if (!root || !window.MutationObserver) return; let open = false;
+  new MutationObserver(() => {
+    const has = !!root.firstElementChild;
+    if (has && open && !root.classList.contains('closing')) root.classList.add('still'); else root.classList.remove('still', 'closing');
+    open = has;
+  }).observe(root, { childList: true });
+})();
 function openSheet(tx, pre) {
   const editing = !!tx;
   const f = tx ? { ...tx, cur: tx.cur || S.cfg.mainCur } : pre ? { type: 'gasto', note: '', date: todayISO(), ...pre } : { type: 'gasto', cat: '', amount: '', note: '', cur: lsGet('cc.lastCur', S.cfg.mainCur), date: S.month === monthKey(todayISO()) ? todayISO() : S.month + '-01' };
@@ -1745,7 +1773,7 @@ function openSheet(tx, pre) {
     </div></div>`;
     if (!editing) setTimeout(() => { const a = $('#fAmount'); a && a.focus(); }, 60);
   };
-  const close = () => { root.innerHTML = ''; };
+  const close = () => { sheetClose(root); };
   const read = () => { f.amount = $('#fAmount').value; f.note = $('#fNote').value; f.date = $('#fDate').value; };
   root.oninput = e => { if (e.target.id === 'fAmount') { f.amount = e.target.value; $('#fEq').innerHTML = eq(); } };
   root.onclick = async e => {
@@ -1807,21 +1835,21 @@ function openSaveSheet(dir, tx) {
   setTimeout(() => { const a = $('#sAmount'); a && !editing && a.focus(); }, 60);
   root.oninput = null;
   root.onclick = async e => {
-    if (e.target.id === 'scrim' || e.target.closest('#closeSheet')) { root.innerHTML = ''; return; }
+    if (e.target.id === 'scrim' || e.target.closest('#closeSheet')) { sheetClose(root); return; }
     const c = e.target.closest('[data-scur]'); if (c) { root.querySelectorAll('[data-scur]').forEach(b => b.setAttribute('aria-pressed', b === c)); f.cur = c.dataset.scur; return; }
     if (e.target.closest('#sSave')) {
       const a = parseAmount($('#sAmount').value); const err = $('#sErr');
       if (!a || a <= 0) { err.textContent = T('Escribe un monto mayor a cero.', 'Enter an amount above zero.'); err.hidden = false; return; }
       const t = { id: tx ? tx.id : newId(), type: 'ahorro', to: into ? 'ahorro' : 'disponible', amount: Math.round(a * 100) / 100, cur: f.cur, rates: (tx && tx.rates) || nowRates(), note: $('#sNote').value.trim(), date: $('#sDate').value || todayISO(), src: 'manual', created: tx ? (tx.created || Date.now()) : Date.now() };
       $('#sSave').disabled = true;
-      try { await store.put(t); root.innerHTML = ''; render(); if (editing) toast(T('Cambios guardados', 'Changes saved')); else setTimeout(() => petEvent('save', t), 50); }
+      try { await store.put(t); sheetClose(root); render(); if (editing) toast(T('Cambios guardados', 'Changes saved')); else setTimeout(() => petEvent('save', t), 50); }
       catch (e2) { $('#sSave').disabled = false; saveError(e2); }
       return;
     }
     const d = e.target.closest('#sDel');
-    if (d) { if (!d.dataset.sure) { d.dataset.sure = '1'; d.textContent = T('Toca otra vez para borrar', 'Tap again to delete'); return; } try { await store.del(tx.id); root.innerHTML = ''; toast(T('Movimiento borrado', 'Entry deleted')); } catch (e2) { saveError(e2); } }
+    if (d) { if (!d.dataset.sure) { d.dataset.sure = '1'; d.textContent = T('Toca otra vez para borrar', 'Tap again to delete'); return; } try { await store.del(tx.id); sheetClose(root); toast(T('Movimiento borrado', 'Entry deleted')); } catch (e2) { saveError(e2); } }
   };
-  root.onkeydown = e => { if (e.key === 'Escape') root.innerHTML = ''; };
+  root.onkeydown = e => { if (e.key === 'Escape') sheetClose(root); };
 }
 
 // ---------- Planificación: repartir el sueldo y llegar a tus metas ----------
@@ -1915,7 +1943,7 @@ function openGoalSheet() {
   draw(); setTimeout(() => { const a = $('#gAmt'); a && a.focus(); }, 60);
   root.oninput = null;
   root.onclick = e => {
-    if (e.target.id === 'scrim' || e.target.closest('#closeSheet')) { read(); root.innerHTML = ''; return; }
+    if (e.target.id === 'scrim' || e.target.closest('#closeSheet')) { read(); sheetClose(root); return; }
     const gk = e.target.closest('[data-gkind]'); if (gk) { read(); GOALF.kind = gk.dataset.gkind; draw(); return; }
     const gc = e.target.closest('[data-gcur]'); if (gc) { read(); GOALF.cur = gc.dataset.gcur; draw(); return; }
     if (e.target.closest('#addGoal')) {
@@ -1923,10 +1951,10 @@ function openGoalSheet() {
       if (!amt || amt <= 0) { err.textContent = T('Escribe cuánto cuesta tu meta.', 'Enter how much your goal costs.'); err.hidden = false; return; }
       const g = { id: newId('g'), kind: GOALF.kind, name: GOALF.name.trim(), amount: Math.abs(amt), cur: GOALF.cur, date: GOALF.date || '' };
       S.cfg.plan.goals = (S.cfg.plan.goals || []).concat([g]); Object.assign(GOALF, { name: '', amt: '', date: '' });
-      root.innerHTML = ''; PLANSUB.t = 'metas'; render(); store.saveCfg(); petPlan(g);
+      sheetClose(root); PLANSUB.t = 'metas'; render(); store.saveCfg(); petPlan(g);
     }
   };
-  root.onkeydown = e => { if (e.key === 'Escape') root.innerHTML = ''; };
+  root.onkeydown = e => { if (e.key === 'Escape') sheetClose(root); };
 }
 function planClick(e) {
   const pcur = e.target.closest('[data-plan-cur]'); if (pcur) { S.cfg.plan.cur = pcur.dataset.planCur; const a = parseAmount($('#planSal').value); S.cfg.plan.salary = a || S.cfg.plan.salary; render(); store.saveCfg(); return true; }
@@ -2341,7 +2369,7 @@ function openDebtSheet(mode, d) {
   const read = () => { ['person:dPerson', 'amount:dAmt', 'date:dDate', 'due:dDue', 'note:dNote'].forEach(x => { const [k, id] = x.split(':'); const el = $('#' + id); if (el) F[k] = el.value; }); const mv = $('#dMove'); if (mv) F.move = mv.checked; };
   draw(); root.oninput = null;
   root.onclick = async e => {
-    if (e.target.id === 'scrim' || e.target.closest('#closeSheet')) { root.innerHTML = ''; return; }
+    if (e.target.id === 'scrim' || e.target.closest('#closeSheet')) { sheetClose(root); return; }
     const nd = e.target.closest('[data-ndir]'); if (nd) { read(); F.dir = nd.dataset.ndir; draw(); return; }
     const dc = e.target.closest('[data-dcur]'); if (dc) { read(); F.cur = dc.dataset.dcur; draw(); return; }
     if (!e.target.closest('#dSave')) return;
@@ -2350,15 +2378,15 @@ function openDebtSheet(mode, d) {
       read(); const a = parseAmount(F.amount);
       if (!F.person.trim() || !a || a <= 0) { err.textContent = T('Escribe el nombre y el monto.', 'Enter name and amount.'); err.hidden = false; return; }
       const debt = { id: newId('d'), dir: F.dir, person: F.person.trim(), amount: Math.abs(a), cur: F.cur, date: F.date || todayISO(), due: F.due || '', note: F.note.trim(), move: F.move, pays: [] };
-      S.cfg.debts = (S.cfg.debts || []).concat([debt]); FINSUB.dir = F.dir; root.innerHTML = ''; store.saveCfg();
+      S.cfg.debts = (S.cfg.debts || []).concat([debt]); FINSUB.dir = F.dir; sheetClose(root); store.saveCfg();
       if (F.move) { try { await store.put({ id: newId(), type: 'deuda', debtId: debt.id, dir: debt.dir, flow: debt.dir === 'owe_me' ? 'out' : 'in', amount: debt.amount, cur: debt.cur, rates: nowRates(), note: (debt.dir === 'owe_me' ? T('Préstamo a ', 'Loan to ') : T('Préstamo de ', 'Loan from ')) + debt.person, date: debt.date, src: 'deuda', created: Date.now() }); } catch (e2) { saveError(e2); } }
       render(); petDebt(debt, 'new');
     } else {
       const a = parseAmount($('#pAmt').value); if (!a || a <= 0) { err.textContent = T('Escribe cuánto abonó.', 'Enter the amount.'); err.hidden = false; return; }
-      root.innerHTML = ''; await debtPay(d, Math.min(Math.abs(a), debtLeft(d)));
+      sheetClose(root); await debtPay(d, Math.min(Math.abs(a), debtLeft(d)));
     }
   };
-  root.onkeydown = e => { if (e.key === 'Escape') root.innerHTML = ''; };
+  root.onkeydown = e => { if (e.key === 'Escape') sheetClose(root); };
 }
 async function debtPay(d, a) {
   d.pays = (d.pays || []).concat([{ amount: Math.round(a * 100) / 100, date: todayISO() }]); S.cfg.debts = S.cfg.debts.slice(); store.saveCfg();
@@ -2580,7 +2608,7 @@ function instDraw() {
         <button class="primary" data-inst="ok">${T('Entendido', 'Got it')}</button>`}
     <button class="linkbtn" data-inst="no" style="justify-self:center">${T('Ahora no', 'Not now')}</button></div>`;
 }
-function instClose() { const r = document.getElementById('instRoot'); if (r) r.remove(); }
+function instClose() { const r = document.getElementById('instRoot'); if (!r) return; r.classList.add('closing'); setTimeout(() => r.remove(), 260); }
 document.addEventListener('click', async e => {
   const b = e.target.closest && e.target.closest('[data-inst]'); if (!b) return;
   const a = b.dataset.inst;
