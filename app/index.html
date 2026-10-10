@@ -1496,7 +1496,7 @@ function viewTasas() {
 // ---------- Sugerencias (solo versión de prueba) ----------
 // Se envían a un Google Form de Ricardo; él las ve en la hoja de respuestas.
 // El formulario tiene dos preguntas (texto y correo): el nombre, la sección y los datos del teléfono van dentro del texto.
-const APP_VER = 'v52';
+const APP_VER = 'v53';
 const SUGG = { form: '1FAIpQLSfxqyUrQ0qfjVElWd7wGnsOfXySq25WfGKISIhriCG8Qs0UQw', email: 'entry.1866519940', text: 'entry.853634718' };
 const TEST_BUILD = /github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
 const suggReady = () => !!(SUGG.form && SUGG.email && SUGG.text);
@@ -2625,7 +2625,7 @@ document.addEventListener('click', async e => {
     const sa = parseAmount($('#openSaveAmt').value); S.cfg.openingSave = sa === null ? null : { amount: sa, cur }; render(); store.saveCfg(); toast(T('Saldo inicial guardado', 'Starting balance saved')); return;
   }
   const pt = e.target.closest('[data-pet]');
-  if (pt) { const k = pt.dataset.pet; if (LOCK.on) { LOCK.pet = k; lockSave(); } appIcon(k); const was = S.cfg.mascot.kind; S.cfg.mascot = { kind: k, name: (was !== k && PETS[k]) ? PETS[k].name : S.cfg.mascot.name }; render(); store.saveCfg(); return; }
+  if (pt) { const k = pt.dataset.pet; if (LOCK.on) { LOCK.pet = k; lockSave(); } appIcon(k); if (TEST_BUILD && standalone() && k !== S.cfg.mascot.kind) setTimeout(() => toast(T('El ícono del teléfono cambia cuando Android lo revise (hasta un día). Si Chrome pregunta, acepta el ícono nuevo.', 'The home screen icon updates when Android checks it (up to a day).')), 1200); const was = S.cfg.mascot.kind; S.cfg.mascot = { kind: k, name: (was !== k && PETS[k]) ? PETS[k].name : S.cfg.mascot.name }; render(); store.saveCfg(); return; }
   if (e.target.closest('#userSave')) { const n = $('#userName').value.trim(); if (n) { S.cfg.user = { ...(S.cfg.user || {}), name: n }; render(); store.saveCfg(); toast(T(`Listo, ${n}`, `Done, ${n}`)); } return; }
   if (e.target.closest('#resetAll')) { openResetSheet(); return; }
   if (e.target.closest('#gearBtn')) { S.tab = 'ajustes'; render(); window.scrollTo(0, 0); petEvent('tab'); return; }
@@ -2733,9 +2733,10 @@ function appIcon(kind) {
   if (!TEST_BUILD) return;
   const k = ['cerdito', 'gato', 'perro', 'guacamaya', 'caiman', 'tigre', 'aguila', 'mosca', 'zancudo'].includes(kind) ? kind : 'cerdito';
   const set = (rel, href) => { const l = document.querySelector(`link[rel="${rel}"]`); if (l && !l.href.endsWith(href)) l.href = href; };
-  set('manifest', 'manifest.webmanifest'); set('apple-touch-icon', `icons/${k}-180.png`); set('icon', `icons/${k}-192.png`);
-  // El ícono instalado vive en icons/app-*.png; el service worker entrega ahí la mascota elegida,
-  // así Chrome la toma en su próxima revisión del ícono sin reinstalar.
+  // Cada mascota tiene su manifest (mismo id de app, íconos distintos). Chrome en Android revisa el
+  // manifest de la página al abrir la app (más o menos una vez al día); si el ícono cambió, pregunta
+  // si quieres actualizarlo. Antes de instalar, deja instalada directamente la mascota elegida.
+  set('manifest', `manifest-${k}.webmanifest`); set('apple-touch-icon', `icons/${k}-180.png`); set('icon', `icons/${k}-192.png`);
   if ('serviceWorker' in navigator) navigator.serviceWorker.ready.then(r => r.active && r.active.postMessage({ pet: k })).catch(() => {});
 }
 const standalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;

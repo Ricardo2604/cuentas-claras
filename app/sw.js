@@ -1,11 +1,11 @@
 // Cuentas Claras: guarda la app en el teléfono para que abra rápido y sin conexión.
 // Sube CACHE cada vez que publiques una versión nueva.
-const CACHE = 'cc-v52';
+const CACHE = 'cc-v53';
 const FONTS = 'cc-fonts'; // las letras de Google se guardan aparte y sobreviven a las versiones nuevas
 const PREF = 'cc-pref';   // aquí se recuerda la mascota elegida para el ícono
 const OCR = 'cc-ocr';     // lector de capturas (Tesseract): se baja una vez y queda para usar sin internet
 const PETS = ['cerdito', 'gato', 'perro', 'guacamaya', 'caiman', 'tigre', 'aguila', 'mosca', 'zancudo'];
-const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/app-192.png', './icons/app-512.png', './icons/app-maskable.png',
+const SHELL = ['./', './index.html', './manifest.webmanifest', ...PETS.map(p => `./manifest-${p}.webmanifest`), './icons/app-192.png', './icons/app-512.png', './icons/app-maskable.png',
   ...PETS.flatMap(p => ['192', '512', 'maskable', '180'].map(s => `./icons/${p}-${s}.png`))];
 const NET_WAIT = 2500; // si la red no contesta en este tiempo, abre con lo guardado
 
