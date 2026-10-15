@@ -590,6 +590,48 @@ function rate(kind) {
   if (man && man.rate > 0 && (!auto || !auto.at || man.at > auto.at)) return { ...man, src: 'manual' };
   return { ...auto, src: S.rates && S.rates[kind] ? 'auto' : 'seed' };
 }
+// Versión sin base de datos (GitHub Pages): el teléfono pide las tasas directo al abrir
+// y como máximo cada 3 horas. Si falla, se queda con la última guardada (o la tuya manual).
+const RATES_TTL = 3 * 3600e3;
+let ratesBusy = null;
+const caracasDay = () => new Date(Date.now() - 4 * 3600e3).toISOString().slice(0, 10);
+async function liveRates(force) {
+  if (store.mode === 'db') return false;
+  const saved = lsGet('cc.rates', null);
+  if (saved && !S.rates) S.rates = saved;
+  if (!force && saved && saved.fetched && Date.now() - saved.fetched < RATES_TTL) return false;
+  if (ratesBusy) return ratesBusy;
+  const get = async url => {
+    const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 12000);
+    try { const r = await fetch(url, { signal: ac.signal, cache: 'no-store' }); if (!r.ok) throw new Error(r.status); return await r.json(); }
+    finally { clearTimeout(t); }
+  };
+  const sane = (v, kind) => {
+    const prev = S.rates && S.rates[kind] && S.rates[kind].rate;
+    return v > 0 && (prev ? Math.abs(v / prev - 1) <= 0.3 : v > 50 && v < 1e6);
+  };
+  ratesBusy = (async () => {
+    const [a, b] = await Promise.allSettled([get('https://ve.dolarapi.com/v1/dolares'), get('https://criptoya.com/api/binancep2p/usdt/ves/1')]);
+    const at = new Date().toISOString(); const next = { ...(S.rates || {}) }; let got = 0;
+    if (a.status === 'fulfilled' && Array.isArray(a.value)) {
+      const o = a.value.find(x => x && x.fuente === 'oficial'); const v = o && Number(o.promedio);
+      if (sane(v, 'bcv')) { next.bcv = { rate: v, date: String(o.fechaActualizacion || '').slice(0, 10) || caracasDay(), at, source: 've.dolarapi.com (oficial)' }; got++; }
+    }
+    if (b.status === 'fulfilled' && b.value) {
+      const v = Number(b.value.ask);
+      if (sane(v, 'usdt')) { next.usdt = { rate: v, at, source: 'criptoya.com binancep2p ask' }; got++; }
+    }
+    if (!got) return false;
+    const d = caracasDay(); const h = (Array.isArray(next.history) ? next.history : []).filter(x => x.d !== d);
+    h.push({ d, bcv: next.bcv ? next.bcv.rate : rate('bcv').rate, usdt: next.usdt ? next.usdt.rate : rate('usdt').rate });
+    next.history = h.slice(-30); next.fetched = Date.now();
+    S.rates = next; lsSet('cc.rates', next); render();
+    return true;
+  })().catch(() => false).finally(() => { ratesBusy = null; });
+  return ratesBusy;
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') liveRates(); });
+setInterval(() => { if (document.visibilityState === 'visible') liveRates(); }, 30 * 60e3);
 function conv(amount, from, to, txRates, kind) {
   from = from || S.cfg.mainCur; to = to || S.cfg.mainCur; kind = kind || S.cfg.convRate;
   if (from === to) return amount;
@@ -674,6 +716,7 @@ const store = {
       const e = lsGet('cc.ess', null); if (e && !c) S.cfg.ess = e;
       applyTheme();
       S.cfgLoaded = true; appIcon(S.cfg.mascot && S.cfg.mascot.kind); S.loaded = true; render(); setTimeout(smsFromUrl, 300);
+      liveRates();
     }
   },
   saveLocal() { lsSet('cc.tx', S.tx); lsSet('cc.cfg', S.cfg); },
@@ -1483,6 +1526,7 @@ function viewTasas() {
     <div class="tools">
       <button class="chip-btn" data-rate-edit="bcv">${T('Poner mi tasa BCV', 'Set my BCV rate')}</button>
       <button class="chip-btn" data-rate-edit="usdt">${T('Poner mi tasa USDT', 'Set my USDT rate')}</button>
+      ${store.mode !== 'db' ? `<button class="chip-btn" id="rateRefresh">${T('Actualizar ahora', 'Refresh now')}</button>` : ''}
     </div>
     ${rateEdit ? `<div class="field"><label for="rateIn">${T('Tasa', 'Rate')} ${rateEdit.toUpperCase()} (Bs ${T('por', 'per')} $)</label><div class="inline"><input id="rateIn" inputmode="decimal" value="${esc(rateFmt(rate(rateEdit).rate))}"><button class="primary sm" id="rateSave">${T('Guardar', 'Save')}</button></div>
       ${S.cfg.manualRates[rateEdit] ? `<button class="linkbtn" id="rateAuto">${T('Volver a la tasa automática', 'Back to the automatic rate')}</button>` : ''}</div>` : ''}
@@ -1496,7 +1540,7 @@ function viewTasas() {
 // ---------- Sugerencias (solo versión de prueba) ----------
 // Se envían a un Google Form de Ricardo; él las ve en la hoja de respuestas.
 // El formulario tiene dos preguntas (texto y correo): el nombre, la sección y los datos del teléfono van dentro del texto.
-const APP_VER = 'v53';
+const APP_VER = 'v54';
 const SUGG = { form: '1FAIpQLSfxqyUrQ0qfjVElWd7wGnsOfXySq25WfGKISIhriCG8Qs0UQw', email: 'entry.1866519940', text: 'entry.853634718' };
 const TEST_BUILD = /github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
 const suggReady = () => !!(SUGG.form && SUGG.email && SUGG.text);
@@ -2678,6 +2722,7 @@ document.addEventListener('click', async e => {
   if (e.target.closest('#remTest')) { const n = uname() || T('pana', 'friend'); const t = '⏰ ' + T(`¡${n}! Así te voy a avisar. Tranquil${G('o', 'a', 'o')}, no muerdo… mucho.`, 'This is how I will remind you. Relax, I don\'t bite… much.'); if (petOn()) petPop(t, 'happy'); else toast(t); return; }
   const gd = e.target.closest('[data-gender]'); if (gd) { S.cfg.user = { ...(S.cfg.user || { name: '' }), gender: gd.dataset.gender }; render(); store.saveCfg(); return; }
   if (e.target.closest('#petNameSave')) { const n = $('#petName').value.trim(); if (n) { S.cfg.mascot = { ...S.cfg.mascot, name: n }; render(); store.saveCfg(); toast(T(`Ahora me llamo ${n}`, `My name is now ${n}`)); } return; }
+  if (e.target.closest('#rateRefresh')) { const b = e.target.closest('#rateRefresh'); b.disabled = true; b.textContent = T('Buscando…', 'Fetching…'); liveRates(true).then(ok => { toast(ok ? T('Tasas al día', 'Rates updated') : T('No pude buscar las tasas. Revisa tu conexión.', "Couldn't fetch rates. Check your connection.")); render(); }); return; }
   const re = e.target.closest('[data-rate-edit]'); if (re) { rateEdit = rateEdit === re.dataset.rateEdit ? null : re.dataset.rateEdit; render(); const i = $('#rateIn'); i && i.focus(); return; }
   if (e.target.closest('#rateSave')) {
     const r = parseAmount($('#rateIn').value); if (!r || r <= 0) return toast(T('Escribe una tasa válida.', 'Enter a valid rate.'));
