@@ -1540,7 +1540,7 @@ function viewTasas() {
 // ---------- Sugerencias (solo versión de prueba) ----------
 // Se envían a un Google Form de Ricardo; él las ve en la hoja de respuestas.
 // El formulario tiene dos preguntas (texto y correo): el nombre, la sección y los datos del teléfono van dentro del texto.
-const APP_VER = 'v54';
+const APP_VER = 'v55';
 const SUGG = { form: '1FAIpQLSfxqyUrQ0qfjVElWd7wGnsOfXySq25WfGKISIhriCG8Qs0UQw', email: 'entry.1866519940', text: 'entry.853634718' };
 const TEST_BUILD = /github\.io$|^localhost$|^127\.0\.0\.1$/.test(location.hostname);
 const suggReady = () => !!(SUGG.form && SUGG.email && SUGG.text);
@@ -2120,9 +2120,44 @@ let SMP = null;
 const petNote = (t, mood) => { petSay({ k: 'note-' + Date.now(), mood, t }); if (!document.getElementById('petPanel')) petPop(t, mood); };
 const PM = { items: [], busy: false, err: '', img: null, text: '', ctl: null };
 function pmItem(x) {
-  const dupKey = x.ref ? S.tx.find(t => t.note && x.ref && t.note.includes('Ref ' + x.ref)) : S.tx.find(t => t.date === x.date && Math.abs(t.amount - x.amount) < 0.01 && (t.cur || 'VES') === x.cur);
+  const dupKey = x.ref ? S.tx.find(t => t.note && x.ref && t.note.includes('Ref ' + x.ref)) : x.amount && S.tx.find(t => t.date === x.date && Math.abs(t.amount - x.amount) < 0.01 && (t.cur || 'VES') === x.cur);
   const desc = [x.who, x.concept].filter(Boolean).join(' ');
   return { ...x, cat: x.type === 'ingreso' ? 'otro_ing' : guessCat(desc, 'gasto'), on: !dupKey, dup: !!dupKey, id: newId('p') };
+}
+// Datos del comprobante aparte del monto (fecha, referencia, a quién, concepto, si entró o salió).
+function pmFields(c) {
+  const dm = c.match(/\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}/) || c.match(/\d{4}-\d{2}-\d{2}/) || c.match(/\d{1,2}\s*(?:de\s+)?(?:ene|feb|mar|abr|may|jun|jul|ago|sep|oct|nov|dic)[a-z]*\.?\s*(?:de\s+|del\s+)?\d{2,4}/i);
+  const ref = (c.match(/ref(?:erencia)?\.?\s*(?:n[°ºo.]*|nro\.?|n[uú]mero)?\s*(?:de\s+)?(?:ref(?:erencia)?\.?)?\s*:?\s*#?\s*(\d{4,})/i) || c.match(/(?:operaci[oó]n|comprobante|transacci[oó]n|recibo)\s*(?:n[°ºo.]*|nro\.?)?\s*:?\s*#?\s*(\d{6,})/i) || [])[1] || '';
+  const phone = (c.match(/0?4(?:12|14|16|22|24|26)[-\s]?\d{3}[-\s]?\d{4}/) || [])[0] || '';
+  const name = (c.match(/\ba\s+(?!tu\b|su\b)([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ]+){0,3})/) || c.match(/(?:beneficiario|destinatario|nombre)\s*:?\s*([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ]+(?:[ \t]+[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ]+){0,3})/i) || [])[1] || '';
+  const concept = ((c.match(/concepto:?\s*([^\n.]+)/i) || [])[1] || '').trim();
+  const rec = /recibi|recibido|abono|acreditad|te (?:ha )?envi|has recibido/i.test(fold(c));
+  return { type: rec ? 'ingreso' : 'gasto', date: (dm && parseDate(dm[0].replace(/\s*de[l]?\s+/gi, ' '))) || todayISO(), ref, who: name || phone.replace(/[-\s]/g, ''), concept };
+}
+// Monto en capturas: los bancos lo escriben de muchas formas (Bs. 1.234,56 · 1.234,56 Bs · Bs1234,56 · 350.00)
+// y a veces en la línea de abajo de "Monto". Se busca por etiqueta, luego por moneda y por último el número con céntimos.
+const PM_NUM = '\\d{1,3}(?:[. ]\\d{3})+(?:,\\d{1,2})?|\\d{1,3}(?:,\\d{3})+(?:\\.\\d{1,2})?|\\d+[.,]\\d{1,2}|\\d+';
+function pmFindAmount(text) {
+  const lines = String(text || '').split(/\n/).map(l => l.replace(/[|]/g, ' ').replace(/\b[oO](?=\d)|(?<=\d)[oO]\b/g, '0').trim()).filter(Boolean);
+  const num = l => { const m = l.replace(/\b\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}\b|\b\d{1,2}:\d{2}(?::\d{2})?\b|\b0?4\d{2}[-\s]?\d{7}\b/g, ' ').match(new RegExp(`(?:^|[^\\d])(${PM_NUM})(?![\\d])`)); return m ? m[1] : null; };
+  const val = (raw, l) => { const v = Math.abs(parseAmount(raw.replace(/\s/g, '')) || 0); return v > 0 && v < 1e9 ? { amount: v, cur: /\$|usd|d[oó]lar/i.test(l) && !/bs|ves|bol[ií]var/i.test(l) ? 'USD' : 'VES' } : null; };
+  const skip = /saldo|disponible|comisi|tel[eé]fono|c[eé]dula|\bc\.?i\b|rif|cuenta|ref|operaci|hora|fecha/i;
+  // 1) Junto a "Monto" / "Importe" / "Total", en la misma línea o en la de abajo.
+  for (let i = 0; i < lines.length; i++) {
+    if (!/monto|importe|total|cantidad|pagaste|enviaste|recibiste|transferiste/i.test(lines[i]) || /saldo|comisi/i.test(lines[i])) continue;
+    const after = lines[i].replace(/^.*?(monto|importe|total|cantidad|pagaste|enviaste|recibiste|transferiste)[^\d$]*/i, '');
+    for (const l of [after, lines[i + 1] || '', lines[i + 2] || '']) { const r = num(l); const v = r && val(r, lines[i] + ' ' + l); if (v && (/[.,]\d{1,2}\b/.test(r) || /bs|\$|ves|usd/i.test(l))) return v; }
+  }
+  // 2) Con moneda pegada: Bs. 350,00 · 350,00 Bs · $ 10.00
+  for (const l of lines) {
+    if (/saldo|comisi/i.test(l)) continue;
+    const m = l.match(new RegExp(`(?:bs\\.?\\s*[sf]?\\.?|ves|usd|\\$)\\s*(${PM_NUM})`, 'i')) || l.match(new RegExp(`(${PM_NUM})\\s*(?:bs\\b|bs\\.|ves|usd|\\$)`, 'i'));
+    const v = m && val(m[1], l); if (v) return v;
+  }
+  // 3) El número con céntimos más grande que no sea saldo, teléfono, referencia ni fecha.
+  let best = null;
+  for (const l of lines) { if (skip.test(l)) continue; const r = num(l); if (!r || !/[.,]\d{2}$/.test(r)) continue; const v = val(r, l); if (v && (!best || v.amount > best.amount)) best = v; }
+  return best;
 }
 function pmParseText(text) {
   const chunks = text.split(/\n\s*\n/).map(c => c.trim()).filter(Boolean);
@@ -2131,13 +2166,7 @@ function pmParseText(text) {
   parts.forEach(c => {
     const am = c.match(/(?:bs\.?s?|ves|monto:?)\s*([\d.]+,\d{1,2}|[\d,]+\.\d{1,2}|\d+)/i) || c.match(/([\d.]+,\d{2})/);
     if (!am) return; const amount = Math.abs(parseAmount(am[1]) || 0); if (!amount) return;
-    const dm = c.match(/\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}/) || c.match(/\d{4}-\d{2}-\d{2}/);
-    const ref = (c.match(/ref(?:erencia)?\.?\s*(?:n[°ºo.]*)?:?\s*#?\s*(\d{4,})/i) || [])[1] || '';
-    const phone = (c.match(/0?4(?:12|14|16|24|26)[-\s]?\d{7}/) || [])[0] || '';
-    const name = (c.match(/\ba\s+(?!tu\b|su\b)([A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ]+(?:\s+[A-ZÁÉÍÓÚÑ][A-Za-zÁÉÍÓÚÑáéíóúñ]+){0,3})/) || [])[1] || '';
-    const concept = ((c.match(/concepto:?\s*([^\n.]+)/i) || [])[1] || '').trim();
-    const rec = /recibi|recibido|abono|acreditad|te (?:ha )?envi|has recibido/i.test(fold(c));
-    out.push(pmItem({ type: rec ? 'ingreso' : 'gasto', amount, cur: /\$|usd/i.test(am[0]) ? 'USD' : 'VES', date: (dm && parseDate(dm[0])) || todayISO(), ref, who: name || phone, concept }));
+    out.push(pmItem({ ...pmFields(c), amount, cur: /\$|usd/i.test(am[0]) ? 'USD' : 'VES' }));
   });
   return out;
 }
@@ -2181,6 +2210,24 @@ const ocrLoad = () => ocrLib || (ocrLib = new Promise((res, rej) => {
   sc.onerror = () => { ocrLib = null; rej(new Error('ocr-net')); };
   document.head.appendChild(sc);
 }));
+// Antes de leer: se amplía la captura, se pasa a gris y se estira el contraste; si el fondo es oscuro se invierte
+// para que quede letra oscura sobre fondo claro, que es lo que mejor lee el lector.
+async function pmPrep(file, invert) {
+  let bmp; try { bmp = await createImageBitmap(file); } catch (e) { return file; }
+  let k = Math.min(3, Math.max(1, 1800 / bmp.width)); if (bmp.width * bmp.height * k * k > 9e6) k = Math.max(1, Math.sqrt(9e6 / (bmp.width * bmp.height)));
+  const w = Math.round(bmp.width * k), h = Math.round(bmp.height * k);
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const g = cv.getContext('2d', { willReadFrequently: true }); g.imageSmoothingQuality = 'high'; g.drawImage(bmp, 0, 0, w, h); if (bmp.close) bmp.close();
+  const im = g.getImageData(0, 0, w, h), d = im.data, hist = new Uint32Array(256); let sum = 0;
+  for (let i = 0; i < d.length; i += 4) { const y = (d[i] * 299 + d[i + 1] * 587 + d[i + 2] * 114) / 1000 | 0; d[i] = y; hist[y]++; sum += y; }
+  const px = w * h; let lo = 0, hi = 255, acc = 0;
+  while (lo < 255 && (acc += hist[lo]) < px * 0.02) lo++;
+  acc = 0; while (hi > 0 && (acc += hist[hi]) < px * 0.02) hi--;
+  if (hi - lo < 40) { lo = 0; hi = 255; }
+  const flip = (sum / px < 110) !== !!invert;
+  for (let i = 0; i < d.length; i += 4) { let v = (d[i] - lo) * 255 / (hi - lo); v = v < 0 ? 0 : v > 255 ? 255 : v; if (flip) v = 255 - v; d[i] = d[i + 1] = d[i + 2] = v; }
+  g.putImageData(im, 0, 0); return cv;
+}
 async function pmOcrImages(files) {
   const arr = Array.from(files).filter(f => /^image\//.test(f.type)).slice(0, 10);
   if (!arr.length) { PM.err = T('Elige fotos o capturas (JPG o PNG).', 'Pick screenshots (JPG or PNG).'); render(); return; }
@@ -2192,20 +2239,32 @@ async function pmOcrImages(files) {
     run.w = await Tz.createWorker('spa', 1, { logger: m => { if (m.status === 'recognizing text') { const el = document.querySelector('.busy'); if (el) el.textContent = `${PM.prog} ${Math.round((m.progress || 0) * 100)}%`; } } });
     for (let i = 0; i < arr.length && !run.stop; i++) {
       PM.prog = arr.length > 1 ? T(`Leyendo captura ${i + 1} de ${arr.length}…`, `Reading ${i + 1} of ${arr.length}…`) : T('Leyendo la captura…', 'Reading the screenshot…'); render();
-      const { data } = await run.w.recognize(arr[i]);
-      // Un comprobante por captura: se quitan las líneas en blanco para que el lector no lo parta en pedazos.
-      const it = pmParseText(String(data && data.text || '').replace(/[ \t]*\n[\s]*/g, '\n').trim());
-      if (it.length) { PM.items.push(it[0]); n++; } else miss++;
+      // Un comprobante por captura. Primera lectura con la imagen mejorada; si no sale el monto, se prueba con los
+      // colores al revés (letra blanca sobre barras de color) y con la original.
+      let txt = '', am = null;
+      for (const src of [() => pmPrep(arr[i]), () => pmPrep(arr[i], true), () => arr[i]]) {
+        if (run.stop) break;
+        const { data } = await run.w.recognize(await src());
+        const t = String(data && data.text || '').replace(/[ \t]*\n[\s]*/g, '\n').trim();
+        txt += '\n' + t; am = pmFindAmount(t); if (am) break;
+      }
+      if (run.stop) break;
+      txt = txt.trim();
+      const f = pmFields(txt);
+      // Sin monto no se rinde: abre la revisión con lo que sí leyó y el monto vacío para escribirlo a mano.
+      PM.items.push(pmItem({ ...f, amount: am ? am.amount : 0, cur: am ? am.cur : 'VES', noAmt: !am }));
+      if (am) n++; else miss++;
     }
   } catch (e) {
     if (!run.stop) PM.err = /ocr/.test(e && e.message) || !navigator.onLine ? T('La primera vez necesito internet para bajar el lector de capturas. Conéctate e intenta otra vez.', 'The first time I need internet to download the reader.') : T('No pude leer esa captura. Prueba con otra más clara o pega el mensaje del banco.', 'Could not read that screenshot.');
   }
   if (run.w) run.w.terminate().catch(() => {});
   if (!run.stop && !PM.err) {
-    if (!n) PM.err = T('No encontré el monto en esa captura. Prueba con una más clara o pega el mensaje del banco.', 'No amount found in that screenshot.');
-    else if (petOn()) petNote(T(`Leí ${n} ${n === 1 ? 'comprobante' : 'comprobantes'}${miss ? ` (${miss} no se ${miss === 1 ? 'entendió' : 'entendieron'})` : ''}. Revisa monto, fecha y referencia antes de guardar.`, `Read ${n} receipts. Check before saving.`), 'happy');
+    if (miss) toast(miss === 1 && !n ? T('No pude leer el monto. Escríbelo abajo y revisa lo demás.', 'Could not read the amount. Type it below.') : T(`En ${miss} ${miss === 1 ? 'captura' : 'capturas'} no pude leer el monto. Escríbelo abajo.`, `Type the missing amounts below.`));
+    else if (petOn()) petNote(T(`Leí ${n} ${n === 1 ? 'comprobante' : 'comprobantes'}. Revisa monto, fecha y referencia antes de guardar.`, `Read ${n} receipts. Check before saving.`), 'happy');
   }
   PM.busy = false; PM.ctl = null; PM.prog = ''; render();
+  const first = document.querySelector('[data-pm-amt]') || document.querySelector('.pm'); if (first && n + miss) first.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 // Puente con MacroDroid / Atajos: el SMS llega por el portapapeles (o en el enlace, ?sms= / #sms=).
 function smsLoad(text) {
@@ -2239,7 +2298,8 @@ function viewPagoMovil() {
   let r = '';
   if (PM.items.length) {
     r = `<section class="card"><div class="label">${PM.auto ? T('Llegó un aviso del banco. ¿Lo agrego?', 'A bank alert arrived. Add it?') : T('Revisa antes de guardar', 'Review before saving')}</div>
-      ${PM.items.map((x, i) => `<div class="pm${x.dup ? ' dup' : ''}"><div class="top"><label><input type="checkbox" data-pm-on="${i}" ${x.on ? 'checked' : ''}>${x.type === 'ingreso' ? '+' : '−'}${money(x.amount, x.cur, 2)}</label><span class="note num">${esc(x.date)}</span></div>
+      ${PM.items.map((x, i) => `<div class="pm${x.dup ? ' dup' : ''}"><div class="top"><label><input type="checkbox" data-pm-on="${i}" ${x.on ? 'checked' : ''}>${x.amount ? (x.type === 'ingreso' ? '+' : '−') + money(x.amount, x.cur, 2) : T('Falta el monto', 'Amount missing')}</label><span class="note num">${esc(x.date)}</span></div>
+        ${x.noAmt ? `<span class="note">${T('No pude leer el monto en la captura. Escríbelo aquí:', 'Could not read the amount. Type it here:')}</span><div class="amount"><input data-pm-amt="${i}" inputmode="decimal" placeholder="0,00" aria-label="${T('Monto', 'Amount')}" value="${x.amount ? esc(String(x.amount).replace('.', ',')) : ''}"><span class="curtog"><button data-pm-cur="${i}" data-c="VES" aria-pressed="${x.cur !== 'USD'}">Bs</button><button data-pm-cur="${i}" data-c="USD" aria-pressed="${x.cur === 'USD'}">$</button></span></div>` : ''}
         <button class="chip-btn" data-pm-type="${i}" style="justify-self:start">${x.type === 'ingreso' ? T('Es ingreso · cambiar a gasto', 'Income · switch to expense') : T('Es gasto · cambiar a ingreso', 'Expense · switch to income')}</button>
         <span class="note">${esc([x.who, x.concept].filter(Boolean).join(' · ') || T('Sin destinatario', 'No payee'))}${x.ref ? ` · Ref ${esc(x.ref)}` : ''}${x.dup ? ` · <b>${T('ya lo tenías anotado', 'already saved')}</b>` : ''}</span>
         <select data-pm-cat="${i}" aria-label="${T('Categoría', 'Category')}">${(x.type === 'ingreso' ? INCOME : allCats()).map(c => `<option value="${esc(c.id)}" ${c.id === x.cat ? 'selected' : ''}>${esc(catName(c))}</option>`).join('')}</select></div>`).join('')}
@@ -2250,7 +2310,10 @@ function viewPagoMovil() {
   return PM.auto ? r + h : h + r;
 }
 async function pmSave() {
+  document.querySelectorAll('[data-pm-amt]').forEach(el => { const v = parseAmount(el.value); PM.items[+el.dataset.pmAmt].amount = v ? Math.abs(v) : 0; });
   const sel = PM.items.filter(x => x.on); if (!sel.length) return;
+  const empty = sel.find(x => !x.amount);
+  if (empty) { toast(T('Escribe el monto antes de guardar.', 'Type the amount before saving.')); const el = document.querySelector(`[data-pm-amt="${PM.items.indexOf(empty)}"]`); if (el) el.focus(); return; }
   const btn = $('#pmSave'); btn.disabled = true; const R = nowRates(); let ok = 0;
   try {
     for (const [i, x] of sel.entries()) {
@@ -2696,6 +2759,7 @@ document.addEventListener('click', async e => {
     toast(LOCK.cred ? T('Listo: la próxima vez que abras la app te pido la huella.', 'Done: fingerprint on next open.') : T('Bloqueo activado con PIN. La huella no se pudo activar aquí.', 'Lock on with PIN; fingerprint unavailable here.')); return; }
   if (e.target.closest('#lkBioAdd')) { try { LOCK.cred = await bioCreate(uname()); lockSave(); render(); toast(T('Huella agregada.', 'Fingerprint added.')); } catch (err) { toast(T('El teléfono no dejó usar la huella aquí.', 'Fingerprint not available here.')); } return; }
   if (e.target.closest('#lkOff')) { if (confirm(T('¿Quitar el bloqueo? Cualquiera que abra la app verá tus cuentas.', 'Turn off the lock?'))) { LOCK.on = false; LOCK.cred = null; LOCK.pin = null; LOCK.salt = null; lockSave(); render(); toast(T('Bloqueo quitado.', 'Lock off.')); } return; }
+  const pcu = e.target.closest('[data-pm-cur]'); if (pcu) { const x = PM.items[+pcu.dataset.pmCur]; const el = document.querySelector(`[data-pm-amt="${pcu.dataset.pmCur}"]`); if (el) x.amount = Math.abs(parseAmount(el.value) || 0); x.cur = pcu.dataset.c; render(); return; }
   const pty = e.target.closest('[data-pm-type]'); if (pty) { const x = PM.items[+pty.dataset.pmType]; x.type = x.type === 'ingreso' ? 'gasto' : 'ingreso'; x.cat = x.type === 'ingreso' ? 'otro_ing' : guessCat([x.who, x.concept].filter(Boolean).join(' '), 'gasto'); render(); return; }
   const smb = e.target.closest('[data-sms]'); if (smb) { S.cfg.smsBridge = smb.dataset.sms === '1'; store.saveCfg(); render(); return; }
   if (e.target.closest('#smsGo')) { smsCheck(); return; }
@@ -2740,6 +2804,7 @@ document.addEventListener('change', e => {
   if (e.target.id === 'pmFile' && e.target.files.length) { const f = Array.from(e.target.files); e.target.value = ''; pmReadImages(f); return; }
   const pmo = e.target.closest && e.target.closest('[data-pm-on]'); if (pmo) { PM.items[+pmo.dataset.pmOn].on = pmo.checked; render(); return; }
   const pmc = e.target.closest && e.target.closest('[data-pm-cat]'); if (pmc) { PM.items[+pmc.dataset.pmCat].cat = pmc.value; return; }
+  const pma = e.target.closest && e.target.closest('[data-pm-amt]'); if (pma) { PM.items[+pma.dataset.pmAmt].amount = Math.abs(parseAmount(pma.value) || 0); render(); return; }
   if (e.target.id === 'csvFile' && e.target.files[0]) {
     const file = e.target.files[0];
     if (/\.(xlsx?|pdf)$/i.test(file.name)) { IMP.error = T('Ese archivo es Excel o PDF. Guárdalo como CSV, o copia y pega las filas aquí.', 'That is an Excel or PDF file. Save it as CSV, or copy and paste the rows here.'); IMP.rows = null; render(); return; }
